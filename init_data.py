@@ -28,7 +28,7 @@ def initialize_sample_data(query: str, max_docs: int):
         for i, doc in enumerate(docs):
             try:
                 meta = doc.metadata
-                authors = ", ".join(meta.get("Authors", [])) if isinstance(meta.get("Authors"), list) else ""
+                authors = ", ".join(meta.get("Authors", [])) if isinstance(meta.get("Authors"), list) else meta.get("Authors")
                 
                 published = None
                 if published_raw := meta.get("Published"):
