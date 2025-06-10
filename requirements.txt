@@ -5,6 +5,7 @@ weaviate-client==4.15.0
 arxiv==2.2.0
 pymupdf==1.26.0
 pypdf==5.6.0
+python-multipart==0.0.20
 
 # AI/ML Frameworks
 sentence-transformers==2.6.0
