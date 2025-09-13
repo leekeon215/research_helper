@@ -5,7 +5,7 @@
 
 ## 주요 기능
 - **다중 데이터 형식 지원**: PDF, TXT, DOCX, JPG, MP3, MP4 등
-- **크로스모달 검색**: 텍스트-이미지 간 유사도 검색
+- **크로스모달 검색**: 텍스트-논문 파일 간 유사도 검색
 - **실시간 시각화**: 벡터 공간에서의 자료 관계 그래프 표현
 - **확장 가능 아키텍처**: 모듈화 설계로 기능 추가 용이
 
@@ -32,13 +32,7 @@ docker run -p 8080:8080 -p 50051:50051 semitechnologies/weaviate:latest
 
 ### 2. FastAPI 서버 실행
 ```
-python -m uvicorn main:app --reload
-```
-
-### 3. 데이터 추가 방법
-- arXiv 논문 수집 예시
-```
-python init_data.py --query "transformer architecture" --max_docs 5
+python -m uvicorn main:app --reload --port 8000
 ```
 
 ## API
