@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
     # 시작 시
     try:
         db_manager.connect()
-        db_manager.initialize_collection()
+        db_manager.ensure_collection_exists() # 컬렉션이 존재하는지 확인
         logger.info("FastAPI 애플리케이션 시작됨")
         yield
     finally:
