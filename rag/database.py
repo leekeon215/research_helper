@@ -12,7 +12,7 @@ class WeaviateManager:
     
     def __init__(self):
         self.client: Optional[weaviate.WeaviateClient] = None
-        self.collection_name = "ResearchPaper"
+        self.collection_name = "ResearchPapers"
     
     def connect(self) -> weaviate.WeaviateClient:
         # Weaviate 클라이언트에 연결

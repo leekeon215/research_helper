@@ -64,10 +64,16 @@ class FileHandler:
             file_path = await self.save_uploaded_file(file)
             
             try:
-                # 업로드된 파일을 임베딩으로 변환
+                # 1. 업로드된 문서를 청크로 분할하여 Weaviate에 저장
+                document_processor.process_and_store_document(
+                    file_path=file_path,
+                    metadata={"title": file.filename}
+                )
+
+                # 2. 검색을 위해 문서 전체를 임베딩
                 file_vector = document_processor.process_uploaded_file_for_search(file_path)
                 
-                # 유사한 문서 검색
+                # 3. 임베딩된 벡터로 유사한 문서 검색
                 similar_docs = similarity_searcher.search_similar_documents(
                     file_content_vector=file_vector,
                     limit=Config.DEFAULT_SEARCH_LIMIT
@@ -87,22 +93,6 @@ class FileHandler:
         except Exception as e:
             logger.error(f"파일 처리 실패 {file.filename}: {str(e)}")
             raise HTTPException(status_code=500, detail="파일 처리 중 오류가 발생했습니다")
-    
-    def cleanup_old_files(self, max_age_hours: int = 24) -> None:
-        # 오래된 업로드 파일들 정리
-        try:
-            import time
-            current_time = time.time()
-            
-            for file_path in Config.UPLOAD_DIR.iterdir():
-                if file_path.is_file():
-                    file_age = current_time - file_path.stat().st_mtime
-                    if file_age > (max_age_hours * 3600):
-                        file_path.unlink()
-                        logger.info(f"오래된 파일 삭제: {file_path}")
-                        
-        except Exception as e:
-            logger.error(f"파일 정리 실패: {str(e)}")
 
 # 전역 파일 핸들러 인스턴스
 file_handler = FileHandler()
