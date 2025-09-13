@@ -1,3 +1,5 @@
 /data
 /rag/uploads
 /rag/__pycache__
+/ss_api/.env
+/ss_api/__pycache__
