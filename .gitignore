@@ -3,3 +3,6 @@
 /rag/__pycache__
 /ss_api/.env
 /ss_api/__pycache__
+/central_server/.env
+/central_server/__pycache__
+/central_server/*/__pycache__

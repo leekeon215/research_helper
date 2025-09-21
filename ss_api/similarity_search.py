@@ -37,11 +37,11 @@ class SimilaritySearcher:
         """
         Semantic Scholar API를 사용하여 텍스트 기반 논문 검색을 수행합니다.
         """
-        api_url = "https://api.semanticscholar.org/graph/v1/paper/search"
+        api_url = "https://api.semanticscholar.org/graph/v1/paper/search/bulk"
         params = {
             "query": query_text,
             "limit": limit,
-            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf,embedding",
+            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf",
             "openAccessPdf": "",
             "publicationDateOrYear": "2022:",
             "sort": "publicationDate:desc",
