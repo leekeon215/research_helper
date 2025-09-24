@@ -37,11 +37,11 @@ class SimilaritySearcher:
         """
         Semantic Scholar API를 사용하여 텍스트 기반 논문 검색을 수행합니다.
         """
-        api_url = "https://api.semanticscholar.org/graph/v1/paper/search/bulk"
+        api_url = "https://api.semanticscholar.org/graph/v1/paper/search"
         params = {
             "query": query_text,
             "limit": limit,
-            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf",
+            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf,embedding",
             "openAccessPdf": "",
             "publicationDateOrYear": "2022:",
             "sort": "publicationDate:desc",
@@ -59,8 +59,6 @@ class SimilaritySearcher:
             response = requests.get(api_url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json().get("data", [])
-
-            # 반환된 데이터는 이미 API에서 최신순으로 정렬되었으므로 추가 정렬이 필요하지 않습니다.
             
             if len(data) > limit:
                 logger.warning(f"API가 {len(data)}개의 결과를 반환했습니다. {limit}개로 제한합니다.")
@@ -98,8 +96,6 @@ class SimilaritySearcher:
             response = requests.get(api_url, params=params, headers=headers)
             response.raise_for_status()
             data = response.json().get("recommendedPapers", [])
-
-            # 반환된 데이터는 이미 API에서 관련도 순으로 정렬되었으므로 추가 정렬이 필요하지 않습니다.
 
             results = [self._parse_paper_data(paper) for paper in data]
 
