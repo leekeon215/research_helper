@@ -87,13 +87,27 @@ class QueryService:
             llm_answer = await self.llm_service.get_final_response(context, request.query_text)
             
             # 4. 최종 응답 데이터 구성 (references)
-            references = [
-                Reference(
-                    paperId=paper.get('paperId', ''),
-                    title=paper.get('title', '제목 없음'),
-                    url=paper.get('openAccessPdf') or paper.get('url'),
-                ) for paper in search_results
-            ]
+            references = []
+            for paper in search_results:
+                # tldr이 딕셔너리 형태일 경우 text만 추출
+                tldr_text = None
+                if tldr_data := paper.get('tldr'):
+                    tldr_text = tldr_data.get('text')
+
+                references.append(
+                    Reference(
+                        paperId=paper.get('paperId', ''),
+                        title=paper.get('title', '제목 없음'),
+                        url=paper.get('openAccessPdf') or paper.get('url'),
+                        authors=[author['name'] for author in paper.get('authors', []) if 'name' in author],
+                        year=paper.get('year'),
+                        # 새로운 필드 매핑
+                        tldr=tldr_text,
+                        citationCount=paper.get('citationCount'),
+                        venue=paper.get('venue'),
+                        fieldsOfStudy=paper.get('fieldsOfStudy')
+                    )
+                )
 
             # 5. 논문 간 유사도 계산
             papers_for_similarity = [

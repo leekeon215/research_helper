@@ -12,6 +12,11 @@ class EmbeddingResult(BaseModel):
     model: str
     vector: List[float]
 
+class TldrResult(BaseModel):
+    # TLDR AI 요약 결과를 나타내는 모델
+    model: str
+    text: str
+
 class SemanticScholarResult(BaseModel):
     # Semantic Scholar API 검색 결과를 나타내는 모델
     paperId: str
@@ -22,3 +27,7 @@ class SemanticScholarResult(BaseModel):
     url: str
     openAccessPdf: Optional[str]
     embedding: Optional[EmbeddingResult]
+    tldr: Optional[TldrResult] = None
+    citationCount: Optional[int] = None
+    venue: Optional[str] = None
+    fieldsOfStudy: Optional[List[str]] = None

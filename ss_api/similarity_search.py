@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 import logging
 import requests
 from fastapi import HTTPException
-from models import SemanticScholarResult, EmbeddingResult
+from models import SemanticScholarResult, EmbeddingResult, TldrResult
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -17,10 +17,15 @@ class SimilaritySearcher:
         if paper.get('openAccessPdf'):
             pdf_url = paper['openAccessPdf'].get('url')
 
-        embedding_data = paper.get('embedding')
         embedding_result = None
-        if isinstance(embedding_data, dict):
-            embedding_result = EmbeddingResult(**embedding_data)
+        if embedding_data := paper.get('embedding'):
+            if isinstance(embedding_data, dict):
+                embedding_result = EmbeddingResult(**embedding_data)
+
+        tldr_result = None
+        if tldr_data := paper.get('tldr'):
+            if isinstance(tldr_data, dict):
+                tldr_result = TldrResult(**tldr_data)
 
         return SemanticScholarResult(
             paperId=paper.get("paperId", ""),
@@ -30,7 +35,11 @@ class SimilaritySearcher:
             year=paper.get("year"),
             url=paper.get("url", ""),
             openAccessPdf=pdf_url,
-            embedding=embedding_result
+            embedding=embedding_result,
+            tldr=tldr_result,
+            citationCount=paper.get("citationCount"),
+            venue=paper.get("venue"),
+            fieldsOfStudy=paper.get("fieldsOfStudy")
         )
 
     def search_by_text_via_api(self, query_text: str, limit: int) -> List[SemanticScholarResult]:
@@ -41,11 +50,10 @@ class SimilaritySearcher:
         params = {
             "query": query_text,
             "limit": limit,
-            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf,embedding",
+            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf,embedding,tldr,citationCount,venue,fieldsOfStudy",
             "openAccessPdf": "",
             "publicationDateOrYear": "2022:",
             "sort": "publicationDate:desc",
-            "fieldsOfStudy": "Computer Science"
         }
 
         headers = {}

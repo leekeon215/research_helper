@@ -1,5 +1,5 @@
 # core/models.py
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class SearchRequest(BaseModel):
@@ -12,6 +12,13 @@ class Reference(BaseModel):
     paperId: str
     title: str
     url: Optional[str] = None
+    authors: Optional[List[str]] = None
+    year: Optional[int] = None
+    # 새로운 필드 추가
+    tldr: Optional[str] = Field(None, description="Too Long; Didn't Read one-line summary")
+    citation_count: Optional[int] = Field(None, alias="citationCount")
+    venue: Optional[str] = None
+    fields_of_study: Optional[List[str]] = Field(None, alias="fieldsOfStudy")
 
 class SimilarityLink(BaseModel):
     # 논문 간 유사도 관계(엣지)를 나타내는 모델
