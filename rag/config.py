@@ -11,7 +11,7 @@ class Config:
     WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", 50051))
     
     # 임베딩 모델 설정
-    EMBEDDING_MODEL_NAME = "sentence-transformers/all-mpnet-base-v2"
+    EMBEDDING_MODEL_NAME = "allenai/specter"
     EMBEDDING_DEVICE = "cpu"
     NORMALIZE_EMBEDDINGS = True
     

@@ -1,4 +1,4 @@
-# similarity_search.py
+# rag/similarity_search.py
 from typing import List
 import logging
 from models import SimilarityResult
@@ -21,12 +21,13 @@ class SimilaritySearcher:
         try:
             collection = db_manager.get_collection()
             
-            # near_vector 검색 수행
+            # near_vector 검색 수행 (벡터값 반환 옵션 추가)
             response = collection.query.near_vector(
                 near_vector=query_vector,
                 limit=limit,
                 distance=distance_threshold,
-                return_metadata=["distance"]
+                return_metadata=["distance"],
+                include_vector=True  # 벡터값 반환
             )
             
             results = []
@@ -42,7 +43,8 @@ class SimilaritySearcher:
                     published=obj.properties.get("published"),
                     doi=obj.properties.get("doi", ""),
                     similarity_score=similarity_score,
-                    distance=distance
+                    distance=distance,
+                    vector=obj.vector.get("default") if obj.vector else None # 벡터값 할당
                 )
                 results.append(result)
             
@@ -72,7 +74,7 @@ class SimilaritySearcher:
             results = self.search_by_vector(
                 query_vector=file_content_vector,
                 limit=limit,
-                distance_threshold=0.5  # 더 관대한 임계값
+                distance_threshold=0.1
             )
             
             # 유사도 순으로 정렬

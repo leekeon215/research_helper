@@ -1,12 +1,13 @@
 # services/query_service.py
 import httpx
 import logging
-import json
 from typing import List, Dict, Any
 from fastapi import HTTPException
-from core.models import SearchRequest, FinalResponse
+from core.models import SearchRequest, FinalResponse, Reference, SimilarityLink
 from core.config import settings
 from services.llm_service import LLMService
+# SimilarityService 임포트
+from services.similarity_service import SimilarityService
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +15,15 @@ class QueryService:
     def __init__(self):
         self.http_client = httpx.AsyncClient(timeout=30.0)
         self.llm_service = LLMService()
+        # SimilarityService 인스턴스 생성
+        self.similarity_service = SimilarityService()
 
     async def process_internal_search(self, request: SearchRequest) -> FinalResponse:
         """
         내부 검색 파이프라인을 실행하고 최종 응답을 반환합니다.
         """
         try:
+            # 1. 내부 RAG 서버에 검색 요청
             response = await self.http_client.post(
                 f"{settings.LOCAL_BACKEND_SERVER_URL}/search",
                 json=request.model_dump()
@@ -27,14 +31,33 @@ class QueryService:
             response.raise_for_status()
             search_results = response.json()
             
+            # 2. LLM 컨텍스트 구성 및 답변 생성
             context = self._build_internal_context(search_results)
             llm_answer = await self.llm_service.get_final_response(context, request.query_text)
 
-            references = [{
-                "title": doc.get('title', ''),
-            } for doc in search_results]
-
-            return FinalResponse(query=request.query_text, answer=llm_answer, references=references)
+            # 3. 최종 응답 데이터 구성 (references)
+            references = [
+                Reference(
+                    paperId=doc.get('doi', ''),
+                    title=doc.get('title', ''),
+                ) for doc in search_results
+            ]
+            
+            # 4. 논문 간 유사도 계산
+            papers_for_similarity = [
+                {"paperId": doc.get("doi"), "embedding": doc.get("vector")}
+                for doc in search_results
+            ]
+            similarity_graph_data = self.similarity_service.calculate_similarity_graph(papers_for_similarity)
+            similarity_graph = [SimilarityLink(**link) for link in similarity_graph_data]
+            
+            # 5. 최종 응답 반환
+            return FinalResponse(
+                query=request.query_text,
+                answer=llm_answer,
+                references=references,
+                similarity_graph=similarity_graph
+            )
         
         except httpx.HTTPStatusError as e:
             raise HTTPException(status_code=e.response.status_code, detail=f"내부 서버 오류: {e.response.text}")
@@ -46,9 +69,11 @@ class QueryService:
         외부 검색 파이프라인을 실행하고 최종 응답을 반환합니다.
         """
         try:
+            # 1. 쿼리 확장
             expanded_query = await self.llm_service.expand_query(request.query_text)
             logger.info(f"원본 쿼리: '{request.query_text}' -> 확장된 쿼리: '{expanded_query}'")
 
+            # 2. 외부 ss_api 서버에 검색 요청
             response = await self.http_client.post(
                 f"{settings.SS_API_SERVER_URL}/search",
                 json={"query_text": expanded_query, "limit": request.limit}
@@ -56,17 +81,38 @@ class QueryService:
             response.raise_for_status()
             search_results = response.json()
             
+            # 3. LLM 컨텍스트 구성 및 답변 생성
             context = self._build_external_context(search_results)
             logger.info(f"--- LLM 컨텍스트 시작 ---\n{context}\n--- LLM 컨텍스트 끝 ---")
             llm_answer = await self.llm_service.get_final_response(context, request.query_text)
             
-            references = [{
-                "title": paper.get('title', '제목 없음'),
-                "id": paper.get('paperId', ''),
-                "url": paper.get('openAccessPdf') or paper.get('url')
-            } for paper in search_results]
+            # 4. 최종 응답 데이터 구성 (references)
+            references = [
+                Reference(
+                    paperId=paper.get('paperId', ''),
+                    title=paper.get('title', '제목 없음'),
+                    url=paper.get('openAccessPdf') or paper.get('url'),
+                ) for paper in search_results
+            ]
 
-            return FinalResponse(query=request.query_text, answer=llm_answer, references=references)
+            # 5. 논문 간 유사도 계산
+            papers_for_similarity = [
+                {
+                    "paperId": paper.get("paperId"),
+                    "embedding": paper.get("embedding", {}).get("vector") if paper.get("embedding") else None,
+                }
+                for paper in search_results
+            ]
+            similarity_graph_data = self.similarity_service.calculate_similarity_graph(papers_for_similarity)
+            similarity_graph = [SimilarityLink(**link) for link in similarity_graph_data]
+
+            # 6. 최종 응답 반환
+            return FinalResponse(
+                query=request.query_text,
+                answer=llm_answer,
+                references=references,
+                similarity_graph=similarity_graph
+            )
         
         except httpx.HTTPStatusError as e:
             raise HTTPException(status_code=e.response.status_code, detail=f"외부 서버 오류: {e.response.text}")

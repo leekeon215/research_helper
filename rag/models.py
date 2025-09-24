@@ -1,4 +1,4 @@
-# models.py
+# rag/models.py
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
@@ -13,6 +13,8 @@ class SimilarityResult(BaseModel):
     doi: str
     similarity_score: float
     distance: float
+    # 벡터값 추가
+    vector: Optional[List[float]] = None
 
 class UploadResponse(BaseModel):
     # 파일 업로드 응답 모델
@@ -37,4 +39,3 @@ class SearchRequest(BaseModel):
     query_text: Optional[str] = None
     limit: int = 5
     similarity_threshold: float = 0.7
-
