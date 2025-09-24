@@ -17,22 +17,31 @@ class LLMService:
         LLM에 요청을 보내고 전체 답변을 반환합니다.
         """
         prompt = f"""
-        사용자 질문: {query}
-        
-        참고 자료:
+        You are a professional and helpful research assistant. Your task is to provide a concise and accurate answer to the user's question based ONLY on the provided context.
+
+        **Instructions:**
+        - Read the provided context carefully.
+        - If the context contains the answer, synthesize a clear and concise response.
+        - If the context does not contain the answer, you MUST state that the information is not available in the provided sources. Do not make up any information.
+        - Structure your answer professionally, starting with a summary and using bullet points for key details if appropriate.
+
+        **Context:**
         {context}
-        
+
         위 자료를 참고하여 질문에 대한 답변을 한국어로 작성해 주세요.
+
+        **User Question:**
+        {query}
         """
         
         try:
             response = await self.client.chat.completions.create(
-                model="gpt-4.1", # 또는 다른 LLM 모델
+                model="gpt-4", # 또는 다른 LLM 모델
                 messages=[
                     {"role": "system", "content": "You are a helpful research assistant."},
                     {"role": "user", "content": prompt}
                 ],
-                stream=False # 스트리밍을 비활성화
+                stream=False
             )
             
             return response.choices[0].message.content
