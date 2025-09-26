@@ -67,14 +67,13 @@ class DocumentProcessor:
             # Weaviate 컬렉션 가져오기
             collection = db_manager.get_collection()
             
-            stored_chunk_ids = []
-            
             # 배치로 청크 저장
-            with collection.batch.dynamic() as batch:
+            with collection.batch.fixed_size(batch_size=100) as batch:
                 for i, chunk in enumerate(chunks):
                     try:
-                        # 임베딩 생성
-                        embedding = embedding_manager.embed_text(chunk)
+                        # 임베딩 생성 (specter 모델에 특화된 텍스트 형식)
+                        text_to_embed = f"{metadata.get('title', '')} [SEP] {chunk}"
+                        embedding = embedding_manager.embed_text(text_to_embed)
                         
                         # 데이터 객체 준비
                         data_object = {
@@ -82,23 +81,24 @@ class DocumentProcessor:
                             "content": chunk,
                             "authors": metadata.get("authors", ""),
                             "published": metadata.get("published"),
-                            "doi": f"{metadata.get('doi', '')}_{i}"
+                            "doi": metadata.get('doi', f"uploaded_{file_path.stem}"),
+                            # 청크 인덱스 저장
+                            "chunk_index": i
                         }
                         
                         # 배치에 추가
-                        result = batch.add_object(
+                        batch.add_object(
                             properties=data_object,
                             vector=embedding
                         )
-                        stored_chunk_ids.append(f"{metadata.get('doi', '')}_{i}")
                         
                     except Exception as e:
                         logger.error(f"청크 {i} 저장 실패: {str(e)}")
                         continue
             
-            logger.info(f"문서 '{file_path.name}' 처리 완료: {len(stored_chunk_ids)}개 청크 저장")
-            return stored_chunk_ids
-            
+            logger.info(f"문서 '{file_path.name}' 처리 완료: {len(chunks)}개 청크 저장")
+            return [f"{metadata.get('doi', '')}_{i}" for i in range(len(chunks))]
+
         except Exception as e:
             logger.error(f"문서 처리 실패 {file_path.name}: {str(e)}")
             raise

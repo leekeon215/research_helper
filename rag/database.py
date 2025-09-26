@@ -43,7 +43,9 @@ class WeaviateManager:
                         Property(name="content", data_type=DataType.TEXT),
                         Property(name="authors", data_type=DataType.TEXT),
                         Property(name="published", data_type=DataType.DATE),
-                        Property(name="doi", data_type=DataType.TEXT)
+                        Property(name="doi", data_type=DataType.TEXT),
+                        # 청크 순서 저장을 위한 인덱스 필드 추가
+                        Property(name="chunk_index", data_type=DataType.NUMBER),
                     ]
                 )
                 logger.info(f"'{self.collection_name}' 컬렉션 생성 완료")

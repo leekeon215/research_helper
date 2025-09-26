@@ -13,6 +13,8 @@ class SimilarityResult(BaseModel):
     doi: str
     similarity_score: float
     distance: float
+    # chunk_index 필드 추가
+    chunk_index: Optional[int] = None
     vector: Optional[List[float]] = None
 
 class UploadResponse(BaseModel):

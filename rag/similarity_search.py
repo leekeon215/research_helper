@@ -44,7 +44,9 @@ class SimilaritySearcher:
                     doi=obj.properties.get("doi", ""),
                     similarity_score=similarity_score,
                     distance=distance,
-                    vector=obj.vector.get("default") if obj.vector else None # 벡터값 할당
+                    vector=obj.vector.get("default") if obj.vector else None, # 벡터값 할당
+                    # chunk_index 값 채우기
+                    chunk_index=obj.properties.get("chunk_index")
                 )
                 results.append(result)
             
@@ -59,7 +61,8 @@ class SimilaritySearcher:
         # 텍스트를 이용한 유사도 검색
         try:
             # 텍스트를 벡터로 변환
-            query_vector = embedding_manager.embed_text(query_text)
+            text_to_embed = f"user's question [SEP] {query_text}"
+            query_vector = embedding_manager.embed_text(text_to_embed)
             
             # 벡터 검색 수행
             return self.search_by_vector(query_vector, limit, distance_threshold)
