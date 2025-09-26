@@ -24,7 +24,7 @@ class SimilaritySearcher:
 
         tldr_result = None
         if tldr_data := paper.get('tldr'):
-            if isinstance(tldr_data, dict):
+            if isinstance(tldr_data, dict) and tldr_data.get('text'):
                 tldr_result = TldrResult(**tldr_data)
 
         return SemanticScholarResult(

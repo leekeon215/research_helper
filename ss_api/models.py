@@ -15,7 +15,7 @@ class EmbeddingResult(BaseModel):
 class TldrResult(BaseModel):
     # TLDR AI 요약 결과를 나타내는 모델
     model: str
-    text: str
+    text: Optional[str] = None
 
 class SemanticScholarResult(BaseModel):
     # Semantic Scholar API 검색 결과를 나타내는 모델
@@ -25,7 +25,7 @@ class SemanticScholarResult(BaseModel):
     authors: List[dict]
     publicationDate: Optional[str]
     openAccessPdf: Optional[str]
-    embedding: Optional[EmbeddingResult]
+    embedding: Optional[EmbeddingResult] = None
     tldr: Optional[TldrResult] = None
     citationCount: Optional[int] = None
     venue: Optional[str] = None

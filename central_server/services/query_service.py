@@ -1,9 +1,15 @@
 # services/query_service.py
 import httpx
 import logging
+import datetime
 from typing import List, Dict, Any
 from fastapi import HTTPException
-from core.models import InternalSearchRequest, ExternalSearchRequest, FinalResponse, Reference, SimilarityLink
+from core.models import (
+    InternalSearchRequest, ExternalSearchRequest,
+    InternalSearchResponse, InternalReference,
+    ExternalSearchResponse, ExternalReference,
+    SimilarityLink
+)
 from core.config import settings
 from services.llm_service import LLMService
 from services.similarity_service import SimilarityService
@@ -14,10 +20,9 @@ class QueryService:
     def __init__(self):
         self.http_client = httpx.AsyncClient(timeout=30.0)
         self.llm_service = LLMService()
-        # SimilarityService 인스턴스 생성
         self.similarity_service = SimilarityService()
 
-    async def process_internal_search(self, request: InternalSearchRequest) -> FinalResponse:
+    async def process_internal_search(self, request: InternalSearchRequest) -> InternalSearchResponse:
         """
         내부 검색 파이프라인을 실행하고 최종 응답을 반환합니다.
         """
@@ -35,23 +40,37 @@ class QueryService:
             llm_answer = await self.llm_service.get_final_response(context, request.query_text)
 
             # 3. 최종 응답 데이터 구성 (references)
-            references = [
-                Reference(
-                    paperId=doc.get('doi', ''),
-                    title=doc.get('title', ''),
-                ) for doc in search_results
-            ]
+            references = []
+            for doc in search_results:
+                publication_date = None
+                if publication_date := doc.get('published'):
+                    publication_date = doc.get('published')
+                
+                authors = []
+                if author_str := doc.get('authors'):
+                    authors = [name.strip() for name in author_str.split(',')]
+
+                # 내부 검색 결과에 맞게 Reference 모델 채우기
+                references.append (
+                    InternalReference( # InternalReference 모델 사용
+                        paper_id=doc.get('doi', ''),
+                        title=doc.get('title', ''),
+                        authors=authors if authors else None,
+                        publication_date=publication_date,
+                        chunk_content=doc.get('content'),
+                        chunk_index=doc.get('chunk_index'),
+                        similarity_score=doc.get('similarity_score')
+                    )
+                )
             
             # 4. 논문 간 유사도 계산
-            papers_for_similarity = [
-                {"paperId": doc.get("doi"), "embedding": doc.get("vector")}
-                for doc in search_results
-            ]
+            papers_for_similarity = [{"paperId": ref.paper_id, "embedding": doc.get("vector")} for ref, doc in zip(references, search_results)]
             similarity_graph_data = self.similarity_service.calculate_similarity_graph(papers_for_similarity)
             similarity_graph = [SimilarityLink(**link) for link in similarity_graph_data]
             
+            
             # 5. 최종 응답 반환
-            return FinalResponse(
+            return InternalSearchResponse( # InternalSearchResponse 모델로 반환
                 query=request.query_text,
                 answer=llm_answer,
                 references=references,
@@ -63,7 +82,7 @@ class QueryService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"내부 검색 처리 중 오류 발생: {str(e)}")
 
-    async def process_external_search(self, request: ExternalSearchRequest) -> FinalResponse:
+    async def process_external_search(self, request: ExternalSearchRequest) -> ExternalSearchResponse:
         """
         외부 검색 파이프라인을 실행하고 최종 응답을 반환합니다.
         """
@@ -94,32 +113,26 @@ class QueryService:
                     tldr_text = tldr_data.get('text')
 
                 references.append(
-                    Reference(
-                        paperId=paper.get('paperId', ''),
+                    ExternalReference( # ExternalReference 모델 사용
+                        paper_id=paper.get('paperId', ''),
                         title=paper.get('title', '제목 없음'),
                         url=paper.get('openAccessPdf'),
                         authors=[author['name'] for author in paper.get('authors', []) if 'name' in author],
-                        publicationDate=paper.get('publicationDate'),
+                        publication_date=paper.get('publicationDate'),
                         tldr=tldr_text,
-                        citationCount=paper.get('citationCount'),
+                        citation_count=paper.get('citationCount'),
                         venue=paper.get('venue'),
-                        fieldsOfStudy=paper.get('fieldsOfStudy')
+                        fields_of_study=paper.get('fieldsOfStudy')
                     )
                 )
 
             # 5. 논문 간 유사도 계산
-            papers_for_similarity = [
-                {
-                    "paperId": paper.get("paperId"),
-                    "embedding": paper.get("embedding", {}).get("vector") if paper.get("embedding") else None,
-                }
-                for paper in search_results
-            ]
+            papers_for_similarity = [{"paperId": ref.paper_id, "embedding": paper.get("embedding", {}).get("vector")} for ref, paper in zip(references, search_results)]
             similarity_graph_data = self.similarity_service.calculate_similarity_graph(papers_for_similarity)
             similarity_graph = [SimilarityLink(**link) for link in similarity_graph_data]
 
             # 6. 최종 응답 반환
-            return FinalResponse(
+            return ExternalSearchResponse( # ExternalSearchResponse 모델로 반환
                 query=request.query_text,
                 answer=llm_answer,
                 references=references,
@@ -139,11 +152,11 @@ class QueryService:
         """외부 논문 검색 결과를 LLM 컨텍스트로 구성"""
         context_parts = []
         for paper in papers:
-            title = paper.get('title', '제목 없음')
+            title = paper.get('title', '제목 없음'),
             authors = ", ".join([author.get('name', '알 수 없음') for author in paper.get('authors', [])]),
-            publicationDate = paper.get('publicationDate', '알 수 없음')
-            abstract = paper.get('abstract', '초록 없음')
-
-            context_parts.append(f"제목: {title}\n저자: {authors}\n출판일: {publicationDate}\n\n초록:\n{abstract}")
+            publication_date = paper.get('publicationDate', '알 수 없음')
+            abstract = paper.get('abstract', '초록 없음'),
+            
+            context_parts.append(f"제목: {title}\n저자: {authors}\n출판일: {publication_date}\n\n초록:\n{abstract}")
         
         return "\n\n---\n\n".join(context_parts)
