@@ -54,7 +54,7 @@ class FileHandler:
             logger.error(f"파일 저장 실패: {str(e)}")
             raise HTTPException(status_code=500, detail="파일 저장 중 오류가 발생했습니다")
     
-    async def process_uploaded_file(self, file: UploadFile) -> List[SimilarityResult]:
+    async def process_uploaded_file(self, file: UploadFile) -> None:
         # 업로드된 파일을 처리하고 유사도 검색 수행
         try:
             # 파일 유효성 검사
@@ -70,17 +70,7 @@ class FileHandler:
                     metadata={"title": file.filename}
                 )
 
-                # 2. 검색을 위해 문서 전체를 임베딩
-                file_vector = document_processor.process_uploaded_file_for_search(file_path)
-                
-                # 3. 임베딩된 벡터로 유사한 문서 검색
-                similar_docs = similarity_searcher.search_similar_documents(
-                    file_content_vector=file_vector,
-                    limit=Config.DEFAULT_SEARCH_LIMIT
-                )
-                
-                logger.info(f"파일 처리 완료: {file.filename}, {len(similar_docs)}개 유사 문서 발견")
-                return similar_docs
+                logger.info(f"파일 처리 및 DB 저장 완료: {file.filename}")
                 
             finally:
                 # 임시 파일 정리

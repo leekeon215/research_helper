@@ -75,19 +75,17 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         logger.info(f"파일 업로드 요청: {file.filename}")
         
-        # 파일 처리 및 유사도 검색
+        # 파일 처리 및 DB 저장
         similar_documents = await file_handler.process_uploaded_file(file)
         
         # 응답 생성
         response = UploadResponse(
             filename=file.filename,
-            message=f"파일 '{file.filename}' 처리 완료",
-            similar_documents=similar_documents,
-            total_found=len(similar_documents),
+            message=f"파일 '{file.filename}'이(가) 성공적으로 업로드 및 처리되었습니다.",
             upload_timestamp=datetime.now()
         )
         
-        logger.info(f"파일 업로드 완료: {file.filename}, {len(similar_documents)}개 유사 문서")
+        logger.info(f"파일 업로드 완료: {file.filename}")
         return response
         
     except HTTPException:

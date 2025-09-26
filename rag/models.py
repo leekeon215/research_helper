@@ -13,15 +13,12 @@ class SimilarityResult(BaseModel):
     doi: str
     similarity_score: float
     distance: float
-    # 벡터값 추가
     vector: Optional[List[float]] = None
 
 class UploadResponse(BaseModel):
     # 파일 업로드 응답 모델
     filename: str
     message: str
-    similar_documents: List[SimilarityResult]
-    total_found: int
     upload_timestamp: datetime
 
 @dataclass
