@@ -13,8 +13,7 @@ class Reference(BaseModel):
     title: str
     url: Optional[str] = None
     authors: Optional[List[str]] = None
-    year: Optional[int] = None
-    # 새로운 필드 추가
+    publicationDate: Optional[str] = None
     tldr: Optional[str] = Field(None, description="Too Long; Didn't Read one-line summary")
     citation_count: Optional[int] = Field(None, alias="citationCount")
     venue: Optional[str] = None
@@ -31,13 +30,4 @@ class FinalResponse(BaseModel):
     query: str
     answer: str
     references: List[Reference]
-    # 유사도 그래프 정보 추가
     similarity_graph: List[SimilarityLink]
-
-class SemanticScholarPaper(BaseModel):
-    title: str
-    abstract: str
-    authors: List[dict]
-    year: int
-    url: str
-    openAccessPdf: Optional[str]

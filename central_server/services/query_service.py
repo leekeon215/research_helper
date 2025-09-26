@@ -6,7 +6,6 @@ from fastapi import HTTPException
 from core.models import SearchRequest, FinalResponse, Reference, SimilarityLink
 from core.config import settings
 from services.llm_service import LLMService
-# SimilarityService 임포트
 from services.similarity_service import SimilarityService
 
 logger = logging.getLogger(__name__)
@@ -98,10 +97,9 @@ class QueryService:
                     Reference(
                         paperId=paper.get('paperId', ''),
                         title=paper.get('title', '제목 없음'),
-                        url=paper.get('openAccessPdf') or paper.get('url'),
+                        url=paper.get('openAccessPdf'),
                         authors=[author['name'] for author in paper.get('authors', []) if 'name' in author],
-                        year=paper.get('year'),
-                        # 새로운 필드 매핑
+                        publicationDate=paper.get('publicationDate'),
                         tldr=tldr_text,
                         citationCount=paper.get('citationCount'),
                         venue=paper.get('venue'),
@@ -142,10 +140,10 @@ class QueryService:
         context_parts = []
         for paper in papers:
             title = paper.get('title', '제목 없음')
-            authors = ", ".join([author.get('name', '알 수 없음') for author in paper.get('authors', [])])
-            year = paper.get('year', '알 수 없음')
+            authors = ", ".join([author.get('name', '알 수 없음') for author in paper.get('authors', [])]),
+            publicationDate = paper.get('publicationDate', '알 수 없음')
             abstract = paper.get('abstract', '초록 없음')
 
-            context_parts.append(f"제목: {title}\n저자: {authors}\n출판년도: {year}\n\n초록:\n{abstract}")
+            context_parts.append(f"제목: {title}\n저자: {authors}\n출판일: {publicationDate}\n\n초록:\n{abstract}")
         
         return "\n\n---\n\n".join(context_parts)

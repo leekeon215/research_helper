@@ -32,8 +32,7 @@ class SimilaritySearcher:
             title=paper.get("title", ""),
             abstract=paper.get("abstract"),
             authors=paper.get("authors", []),
-            year=paper.get("year"),
-            url=paper.get("url", ""),
+            publicationDate=paper.get("publicationDate"),
             openAccessPdf=pdf_url,
             embedding=embedding_result,
             tldr=tldr_result,
@@ -50,7 +49,7 @@ class SimilaritySearcher:
         params = {
             "query": query_text,
             "limit": limit,
-            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf,embedding,tldr,citationCount,venue,fieldsOfStudy",
+            "fields": "paperId,title,abstract,authors,publicationDate,openAccessPdf,embedding,tldr,citationCount,venue,fieldsOfStudy",
             "openAccessPdf": "",
             "publicationDateOrYear": "2022:",
             "sort": "publicationDate:desc",

@@ -23,8 +23,7 @@ class SemanticScholarResult(BaseModel):
     title: str
     abstract: Optional[str]
     authors: List[dict]
-    year: Optional[int]
-    url: str
+    publicationDate: Optional[str]
     openAccessPdf: Optional[str]
     embedding: Optional[EmbeddingResult]
     tldr: Optional[TldrResult] = None
