@@ -2,10 +2,14 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-class SearchRequest(BaseModel):
+class InternalSearchRequest(BaseModel):
     query_text: str
     limit: int = 5
     similarity_threshold: float = 0.1
+
+class ExternalSearchRequest(BaseModel):
+    query_text: str
+    limit: int = 5
 
 class Reference(BaseModel):
     # 개별 논문 정보를 담는 모델

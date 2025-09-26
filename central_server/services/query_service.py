@@ -3,7 +3,7 @@ import httpx
 import logging
 from typing import List, Dict, Any
 from fastapi import HTTPException
-from core.models import SearchRequest, FinalResponse, Reference, SimilarityLink
+from core.models import InternalSearchRequest, ExternalSearchRequest, FinalResponse, Reference, SimilarityLink
 from core.config import settings
 from services.llm_service import LLMService
 from services.similarity_service import SimilarityService
@@ -17,7 +17,7 @@ class QueryService:
         # SimilarityService 인스턴스 생성
         self.similarity_service = SimilarityService()
 
-    async def process_internal_search(self, request: SearchRequest) -> FinalResponse:
+    async def process_internal_search(self, request: InternalSearchRequest) -> FinalResponse:
         """
         내부 검색 파이프라인을 실행하고 최종 응답을 반환합니다.
         """
@@ -63,7 +63,7 @@ class QueryService:
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"내부 검색 처리 중 오류 발생: {str(e)}")
 
-    async def process_external_search(self, request: SearchRequest) -> FinalResponse:
+    async def process_external_search(self, request: ExternalSearchRequest) -> FinalResponse:
         """
         외부 검색 파이프라인을 실행하고 최종 응답을 반환합니다.
         """

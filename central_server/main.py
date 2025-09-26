@@ -4,7 +4,7 @@ import logging
 from typing import List, Dict, Any
 
 from core.config import settings
-from core.models import SearchRequest, FinalResponse
+from core.models import InternalSearchRequest, ExternalSearchRequest, FinalResponse
 from services.query_service import QueryService
 
 # 로깅 설정
@@ -25,7 +25,7 @@ async def root():
     return {"message": "중앙 처리 서버가 실행 중입니다."}
 
 @app.post("/search/internal", response_model=FinalResponse)
-async def search_internal_data(request: SearchRequest):
+async def search_internal_data(request: InternalSearchRequest):
     """
     내부 백엔드 서버를 통해 검색을 수행하고 LLM 답변을 반환합니다.
     """
@@ -40,7 +40,7 @@ async def search_internal_data(request: SearchRequest):
         raise HTTPException(status_code=500, detail="내부 검색 처리 중 오류가 발생했습니다.")
 
 @app.post("/search/external", response_model=FinalResponse)
-async def search_external_data(request: SearchRequest):
+async def search_external_data(request: ExternalSearchRequest):
     """
     Semantic Scholar API 서버를 통해 검색을 수행하고 LLM 답변을 반환합니다.
     """
