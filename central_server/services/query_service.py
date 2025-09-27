@@ -4,12 +4,15 @@ import logging
 import datetime
 from typing import List, Dict, Any
 from fastapi import HTTPException
+from collections import defaultdict
+
 from core.models import (
     InternalSearchRequest, ExternalSearchRequest,
-    InternalSearchResponse, InternalReference,
+    InternalSearchResponse, InternalDocumentReference, ChunkReference,
     ExternalSearchResponse, ExternalReference,
     SimilarityLink
 )
+
 from core.config import settings
 from services.llm_service import LLMService
 from services.similarity_service import SimilarityService
@@ -40,26 +43,45 @@ class QueryService:
             llm_answer = await self.llm_service.get_final_response(context, request.query_text)
 
             # 3. 최종 응답 데이터 구성 (references)
-            references = []
-            for doc in search_results:
-                publication_date = None
-                if publication_date := doc.get('published'):
-                    publication_date = doc.get('published')
-                
-                authors = []
-                if author_str := doc.get('authors'):
-                    authors = [name.strip() for name in author_str.split(',')]
+            # 청크를 문서(DOI) 기준으로 그룹화
+            grouped_references = defaultdict(lambda: {"chunks": [], "meta": {}})
+            
+            for doc_chunk in search_results:
+                doc_id = doc_chunk.get('doi')
+                if not doc_id:
+                    continue
 
-                # 내부 검색 결과에 맞게 Reference 모델 채우기
-                references.append (
-                    InternalReference( # InternalReference 모델 사용
-                        paper_id=doc.get('doi', ''),
-                        title=doc.get('title', ''),
-                        authors=authors if authors else None,
-                        publication_date=publication_date,
-                        chunk_content=doc.get('content'),
-                        chunk_index=doc.get('chunk_index'),
-                        similarity_score=doc.get('similarity_score')
+                # 청크 정보 생성
+                chunk_ref = ChunkReference(
+                    chunk_content=doc_chunk.get('content'),
+                    chunk_index=doc_chunk.get('chunk_index'),
+                    similarity_score=doc_chunk.get('similarity_score')
+                )
+                grouped_references[doc_id]["chunks"].append(chunk_ref)
+
+                # 메타데이터는 한 번만 저장
+                if not grouped_references[doc_id]["meta"]:
+                    publication_date = doc_chunk.get('published')
+                    authors = []
+                    if author_str := doc_chunk.get('authors'):
+                        authors = [name.strip() for name in author_str.split(',')]
+                    
+                    grouped_references[doc_id]["meta"] = {
+                        "title": doc_chunk.get('title'),
+                        "authors": authors,
+                        "publication_date": publication_date
+                    }
+
+            # 그룹화된 데이터를 최종 응답 모델 리스트로 변환
+            references = []
+            for doc_id, data in grouped_references.items():
+                references.append(
+                    InternalDocumentReference(
+                        paper_id=doc_id,
+                        title=data["meta"]["title"],
+                        authors=data["meta"]["authors"],
+                        publication_date=data["meta"]["publication_date"],
+                        chunks=sorted(data["chunks"], key=lambda c: c.chunk_index) # 청크 순서대로 정렬
                     )
                 )
             

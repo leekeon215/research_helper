@@ -19,21 +19,26 @@ class SimilarityLink(BaseModel):
 
 # --- 내부 검색 전용 모델 ---
 
-class InternalReference(BaseModel):
-    """내부 문서 검색 결과를 위한 Reference 모델"""
+class ChunkReference(BaseModel):
+    """검색된 개별 청크의 정보를 담는 모델"""
+    chunk_content: str = Field(description="검색된 청크의 원문 내용")
+    chunk_index: int = Field(description="문서 내 청크의 순서")
+    similarity_score: float = Field(description="벡터 검색 유사도 점수")
+
+class InternalDocumentReference(BaseModel):
+    """그룹화된 내부 문서 참조 모델"""
     paper_id: str = Field(description="문서의 고유 ID (DOI)")
     title: str
     authors: Optional[List[str]] = None
-    pubication_date: Optional[str] = None
-    chunk_content: Optional[str] = Field(None, description="검색된 청크의 원문 내용")
-    chunk_index: Optional[int] = Field(None, description="문서 내 청크의 순서")
-    similarity_score: Optional[float] = Field(None, description="벡터 검색 유사도 점수")
+    publication_date: Optional[str] = None
+    # 각 문서에 속한 청크들의 목록
+    chunks: List[ChunkReference]
 
 class InternalSearchResponse(BaseModel):
     """내부 검색 API의 최종 응답 모델"""
     query: str
     answer: str
-    references: List[InternalReference]
+    references: List[InternalDocumentReference]
     similarity_graph: List[SimilarityLink]
 
 # --- 외부 검색 전용 모델 ---
