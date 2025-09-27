@@ -45,7 +45,6 @@ class SimilaritySearcher:
                     similarity_score=similarity_score,
                     distance=distance,
                     vector=obj.vector.get("default") if obj.vector else None, # 벡터값 할당
-                    # chunk_index 값 채우기
                     chunk_index=obj.properties.get("chunk_index")
                 )
                 results.append(result)
@@ -71,24 +70,5 @@ class SimilaritySearcher:
             logger.error(f"텍스트 검색 실패: {str(e)}")
             raise
     
-    def search_similar_documents(self, file_content_vector: List[float], limit: int = 5) -> List[SimilarityResult]:
-        # 업로드된 파일과 유사한 문서 검색
-        try:
-            results = self.search_by_vector(
-                query_vector=file_content_vector,
-                limit=limit,
-                distance_threshold=0.1
-            )
-            
-            # 유사도 순으로 정렬
-            results.sort(key=lambda x: x.similarity_score, reverse=True)
-            
-            logger.info(f"유사 문서 검색 완료: {len(results)}개 결과")
-            return results
-            
-        except Exception as e:
-            logger.error(f"유사 문서 검색 실패: {str(e)}")
-            raise
-
 # 전역 검색기 인스턴스
 similarity_searcher = SimilaritySearcher()

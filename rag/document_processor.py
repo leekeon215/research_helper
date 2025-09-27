@@ -82,7 +82,6 @@ class DocumentProcessor:
                             "authors": metadata.get("authors", ""),
                             "published": metadata.get("published"),
                             "doi": metadata.get('doi', f"uploaded_{file_path.stem}"),
-                            # 청크 인덱스 저장
                             "chunk_index": i
                         }
                         
@@ -101,51 +100,6 @@ class DocumentProcessor:
 
         except Exception as e:
             logger.error(f"문서 처리 실패 {file_path.name}: {str(e)}")
-            raise
-    
-    def process_raw_content(self, content: str, metadata: Dict[str, Any]) -> List[str]:
-        # 임시 파일 없이 직접 콘텐츠 처리
-        try:
-            # 텍스트 분할
-            chunks = self.text_splitter.split_text(content)
-            
-            # Weaviate 컬렉션 가져오기
-            collection = db_manager.get_collection()
-            
-            stored_chunk_ids = []
-            
-            # 배치로 청크 저장
-            with collection.batch.dynamic() as batch:
-                for i, chunk in enumerate(chunks):
-                    try:
-                        # 임베딩 생성
-                        embedding = embedding_manager.embed_text(chunk)
-                        
-                        # 데이터 객체 준비
-                        data_object = {
-                            "title": metadata.get("title", ""),
-                            "content": chunk,
-                            "authors": metadata.get("authors", ""),
-                            "published": metadata.get("published"),
-                            "doi": f"{metadata.get('doi', '')}_{i}"
-                        }
-                        
-                        # 배치에 추가
-                        result = batch.add_object(
-                            properties=data_object,
-                            vector=embedding
-                        )
-                        stored_chunk_ids.append(f"{metadata.get('doi', '')}_{i}")
-                        
-                    except Exception as e:
-                        logger.error(f"청크 {i} 저장 실패: {str(e)}")
-                        continue
-            
-            logger.info(f"문서 처리 완료: {len(stored_chunk_ids)}개 청크 저장")
-            return stored_chunk_ids
-            
-        except Exception as e:
-            logger.error(f"문서 처리 실패: {str(e)}")
             raise
 
     def process_uploaded_file_for_search(self, file_path: Path) -> List[float]:
