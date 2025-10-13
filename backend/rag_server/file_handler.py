@@ -7,7 +7,6 @@ from fastapi import UploadFile, HTTPException
 from config import Config
 from models import SimilarityResult
 from document_processor import document_processor
-from similarity_search import similarity_searcher
 
 logger = logging.getLogger(__name__)
 
