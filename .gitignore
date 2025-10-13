@@ -1,4 +1,3 @@
-/backend/data
 /backend/rag/uploads
 /backend/rag/__pycache__
 /backend/ss_api/.env
