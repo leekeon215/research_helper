@@ -11,5 +11,9 @@ class Settings:
     
     # LLM API 키
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY")
+    
+    # Central Server 포트 설정
+    CENTRAL_SERVER_PORT: int = int(os.getenv("CENTRAL_SERVER_PORT", "8000"))
+    CENTRAL_SERVER_HOST: str = os.getenv("CENTRAL_SERVER_HOST", "0.0.0.0")
 
 settings = Settings()
