@@ -1,5 +1,6 @@
 # main.py
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import logging
 from typing import List, Dict, Any
 
@@ -15,6 +16,15 @@ app = FastAPI(
     title="Central Processing Server",
     description="중앙에서 검색 및 LLM 처리를 담당하는 서버",
     version="1.0.0"
+)
+
+# CORS 미들웨어 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 개발 환경에서는 모든 origin 허용
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # 의존성 주입을 위한 서비스 인스턴스
@@ -53,3 +63,7 @@ async def search_external_data(request: ExternalSearchRequest):
     except Exception as e:
         logger.error(f"외부 검색 처리 중 오류 발생: {str(e)}")
         raise HTTPException(status_code=500, detail="외부 검색 처리 중 오류가 발생했습니다.")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host=settings.CENTRAL_SERVER_HOST, port=settings.CENTRAL_SERVER_PORT)

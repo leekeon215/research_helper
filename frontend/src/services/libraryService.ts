@@ -30,12 +30,12 @@ export class LibraryService {
   /**
    * 새 논문 추가
    */
-  static addPaper(paper: Omit<LibraryPaper, 'id' | 'uploaded_at'>): LibraryPaper {
+  static addPaper(paper: Omit<LibraryPaper, 'id' | 'uploadedAt'>): LibraryPaper {
     const papers = this.getLibraryPapers();
     const newPaper: LibraryPaper = {
       ...paper,
       id: `paper-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
-      uploaded_at: new Date().toISOString()
+      uploadedAt: new Date().toISOString()
     };
     
     papers.push(newPaper);
@@ -85,7 +85,7 @@ export class LibraryService {
         author.name.toLowerCase().includes(lowercaseQuery)
       ) ||
       paper.abstract?.toLowerCase().includes(lowercaseQuery) ||
-      paper.fields_of_study?.some(field => 
+      paper.fieldsOfStudy?.some(field => 
         field.toLowerCase().includes(lowercaseQuery)
       )
     );
@@ -122,12 +122,12 @@ export class LibraryService {
     const allAuthors = papers.flatMap(paper => paper.authors);
     const uniqueAuthors = new Set(allAuthors.map(author => author.name));
     
-    const allFields = papers.flatMap(paper => paper.fields_of_study || []);
+    const allFields = papers.flatMap(paper => paper.fieldsOfStudy || []);
     const uniqueFields = Array.from(new Set(allFields));
 
     const sortedByDate = papers
-      .filter(paper => paper.publication_date)
-      .sort((a, b) => new Date(a.publication_date!).getTime() - new Date(b.publication_date!).getTime());
+      .filter(paper => paper.publicationDate)
+      .sort((a, b) => new Date(a.publicationDate!).getTime() - new Date(b.publicationDate!).getTime());
 
     return {
       totalPapers: papers.length,

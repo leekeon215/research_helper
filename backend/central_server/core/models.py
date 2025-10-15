@@ -29,10 +29,10 @@ class ChunkReference(BaseModel):
 
 class InternalDocumentReference(BaseModel):
     """그룹화된 내부 문서 참조 모델"""
-    paper_id: str = Field(..., description="문서의 고유 ID (주로 DOI)")
+    paperId: str = Field(..., description="문서의 고유 ID (주로 DOI)")
     title: str = Field(..., description="문서의 제목 (주로 파일명)")
     authors: Optional[List[str]] = Field(None, description="문서의 저자 목록")
-    publication_date: Optional[str] = Field(None, description="문서의 발행일")
+    publicationDate: Optional[str] = Field(None, description="문서의 발행일")
     chunks: List[ChunkReference] = Field(..., description="문서 내에서 검색된 관련 청크 목록")
 
 class InternalSearchResponse(BaseModel):
@@ -46,15 +46,15 @@ class InternalSearchResponse(BaseModel):
 
 class ExternalReference(BaseModel):
     """외부 논문 검색 결과를 위한 Reference 모델"""
-    paper_id: str = Field(..., description="Semantic Scholar의 논문 고유 ID")
+    paperId: str = Field(..., description="Semantic Scholar의 논문 고유 ID")
     title: str = Field(..., description="논문의 제목")
-    url: Optional[str] = Field(None, description="논문 상세 페이지 또는 PDF 파일 URL")
+    openAccessPdf: Optional[str] = Field(None, description="논문 상세 페이지 또는 PDF 파일 URL")
     authors: Optional[List[str]] = Field(None, description="논문의 저자 목록")
-    publication_date: Optional[str] = Field(None, description="논문의 발행일")
+    publicationDate: Optional[str] = Field(None, description="논문의 발행일")
     tldr: Optional[str] = Field(None, description="AI가 생성한 한 문장 요약 (TL;DR)")
-    citation_count: Optional[int] = Field(None, description="논문의 피인용 횟수")
+    citationCount: Optional[int] = Field(None, description="논문의 피인용 횟수")
     venue: Optional[str] = Field(None, description="논문이 게재된 학회 또는 저널명")
-    fields_of_study: Optional[List[str]] = Field(None, description="논문이 속한 연구 분야 목록")
+    fieldsOfStudy: Optional[List[str]] = Field(None, description="논문이 속한 연구 분야 목록")
 
 class ExternalSearchResponse(BaseModel):
     """외부 검색 API의 최종 응답 모델"""

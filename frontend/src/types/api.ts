@@ -7,21 +7,21 @@ export interface ExternalSearchRequest {
 }
 
 export interface ExternalReference {
-  paper_id: string;
+  paperId: string;
   title: string;
-  url?: string;
+  openAccessPdf?: string;
   authors?: string[];
-  publication_date?: string;
+  publicationDate?: string;
   tldr?: string;
-  citation_count?: number;
+  citationCount?: number;
   venue?: string;
-  fields_of_study?: string[];
+  fieldsOfStudy?: string[];
 }
 
 export interface SimilarityLink {
   source: string;
   target: string;
-  score: number;
+  similarity: number;
   type: 'citation' | 'similarity';
 }
 
@@ -46,10 +46,10 @@ export interface ChunkReference {
 }
 
 export interface InternalDocumentReference {
-  paper_id: string;
+  paperId: string;
   title: string;
   authors?: string[];
-  publication_date?: string;
+  publicationDate?: string;
   chunks: ChunkReference[];
 }
 

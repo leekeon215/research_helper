@@ -148,11 +148,17 @@ class GraphUtils {
 // ==================== 메인 컴포넌트 ====================
 interface GraphComponentProps {
   graph: PaperGraph;
+  onNodeClick?: (nodeId: string) => void;
+  selectedNodeId?: string;
   searchMode?: 'internal' | 'external';
+  isExpanding: boolean;
 }
 
 const GraphComponent: React.FC<GraphComponentProps> = ({
-  graph
+  graph,
+  onNodeClick,
+  selectedNodeId,
+  isExpanding
 }) => {
   const [cy, setCy] = useState<cytoscape.Core | null>(null);
   const simulationRef = useRef<d3.Simulation<D3Node, D3Link> | null>(null);
@@ -172,37 +178,50 @@ const GraphComponent: React.FC<GraphComponentProps> = ({
 
   // Cytoscape elements 생성 함수
   const createCytoscapeElements = useCallback(() => {
-    const cytoscapeElements: cytoscape.ElementDefinition[] = [];
-    
-    // 노드 추가
-    graph.nodes.forEach(node => {
-      cytoscapeElements.push({
-        data: {
-          ...node.data,
-          id: node.id,
-          label: node.data.title,
-          type: node.data.type,
-          nodeSize: nodeSizeConfig.nodeSize,
-          labelSize: nodeSizeConfig.labelSize,
-          fontSize: nodeSizeConfig.fontSize
+    try {
+      const cytoscapeElements: cytoscape.ElementDefinition[] = [];
+      
+      // 노드 추가
+      graph.nodes.forEach(node => {
+        cytoscapeElements.push({
+          data: {
+            ...node.data,
+            id: node.id,
+            label: node.data.title,
+            type: node.data.type,
+            nodeSize: nodeSizeConfig.nodeSize,
+            labelSize: nodeSizeConfig.labelSize,
+            fontSize: nodeSizeConfig.fontSize
+          }
+        });
+      });
+      
+      // 노드 ID 집합 생성
+      const nodeIds = new Set(graph.nodes.map(node => node.id));
+      
+      // 엣지 추가 (유효한 엣지만)
+      graph.edges.forEach(edge => {
+        // source와 target이 모두 존재하는지 확인
+        if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+          cytoscapeElements.push({
+            data: {
+              id: edge.id,
+              source: edge.source,
+              target: edge.target,
+              score: edge.score || edge.similarity, // 두 필드 모두 지원
+              type: edge.type
+            }
+          });
+        } else {
+          console.warn(`Invalid edge skipped: ${edge.source} -> ${edge.target} (node not found)`);
         }
       });
-    });
-    
-    // 엣지 추가
-    graph.edges.forEach(edge => {
-      cytoscapeElements.push({
-        data: {
-          id: edge.id,
-          source: edge.source,
-          target: edge.target,
-          score: edge.score,
-          type: edge.type
-        }
-      });
-    });
-    
-    return cytoscapeElements;
+      
+      return cytoscapeElements;
+    } catch (error) {
+      console.error('Cytoscape elements 생성 중 오류:', error);
+      return [];
+    }
   }, [graph, nodeSizeConfig]);
 
   // Cytoscape elements 생성
@@ -210,23 +229,53 @@ const GraphComponent: React.FC<GraphComponentProps> = ({
 
   // ==================== D3 시뮬레이션 설정 ====================
   const setupSimulation = useCallback((cy: cytoscape.Core) => {
+    // 기존 시뮬레이션 정리
+    if (simulationRef.current) {
+      simulationRef.current.stop();
+    }
+
     // 노드와 링크 데이터 준비
-    const nodes: D3Node[] = graph.nodes.map(node => ({
-      id: node.id,
-      x: node.position?.x || Math.random() * 400,
-      y: node.position?.y || Math.random() * 400,
-      fx: null,
-      fy: null,
-      locked: node.locked || false,
-      data: node.data
-    }));
+    const nodes: D3Node[] = graph.nodes.map(node => {
+      // 기존 Cytoscape에서 노드 위치 가져오기
+      const existingNode = cy.getElementById(node.id);
+      let x: number;
+      let y: number;
+      
+      if (existingNode.nonempty()) {
+        const pos = existingNode.position();
+        x = pos.x;
+        y = pos.y;
+      } else {
+        // 새 노드의 경우 화면 중앙 근처에 생성
+        const angle = Math.random() * 2 * Math.PI;
+        const radius = 80 + Math.random() * 80; // 화면 중앙에서 80-160px 반경
+        x = Math.cos(angle) * radius;
+        y = Math.sin(angle) * radius;
+      }
+
+      return {
+        id: node.id,
+        x,
+        y,
+        fx: null,
+        fy: null,
+        locked: node.locked || false,
+        data: node.data
+      };
+    });
     
-    const links: D3Link[] = graph.edges.map(edge => ({
-      source: edge.source,
-      target: edge.target,
-      score: edge.score,
-      type: edge.type
-    }));
+    const links: D3Link[] = graph.edges
+      .filter(edge => {
+        const sourceExists = nodes.some(node => node.id === edge.source);
+        const targetExists = nodes.some(node => node.id === edge.target);
+        return sourceExists && targetExists;
+      })
+      .map(edge => ({
+        source: edge.source,
+        target: edge.target,
+        score: edge.score || edge.similarity,
+        type: edge.type
+      }));
     
     nodesRef.current = nodes;
     linksRef.current = links;
@@ -273,18 +322,27 @@ const GraphComponent: React.FC<GraphComponentProps> = ({
     
     // Cytoscape 위치 업데이트
     simulation.on("tick", () => {
-      cy.batch(() => {
-        nodes.forEach(node => {
-          if (!node.locked && node.fx === null && node.fy === null) {
-            const cyNode = cy.getElementById(node.id);
-            if (cyNode.nonempty()) {
-              cyNode.position({ x: node.x, y: node.y });
-            }
-          }
-        });
-      });
+      if (cy && !cy.destroyed()) {
+        try {
+          cy.batch(() => {
+            nodes.forEach(node => {
+              if (!node.locked && node.fx === null && node.fy === null) {
+                const cyNode = cy.getElementById(node.id);
+                if (cyNode.nonempty()) {
+                  cyNode.position({ x: node.x, y: node.y });
+                }
+              }
+            });
+          });
+        } catch (error) {
+          console.warn('Cytoscape batch update failed:', error);
+        }
+      }
     });
-  }, [graph]);
+
+    // 시뮬레이션 시작 - 더 강하게 시작하고 더 오래 실행되도록
+    simulation.alpha(0.8).alphaTarget(0.05).restart();
+  }, [graph, cy]);
 
   // ==================== 이벤트 핸들러들 ====================
   const handleMouseOver = useCallback((event: cytoscape.EventObject) => {
@@ -496,6 +554,19 @@ const GraphComponent: React.FC<GraphComponentProps> = ({
   // ==================== 이벤트 리스너 등록 ====================
   useEffect(() => {
     if (cy) {
+      // 로딩 중일 때는 사용자 상호작용 비활성화
+      if (isExpanding) {
+        cy.userPanningEnabled(false);
+        cy.userZoomingEnabled(false);
+        cy.boxSelectionEnabled(false);
+        cy.nodes().ungrabify(); // 노드 드래그 비활성화
+      } else {
+        cy.userPanningEnabled(true);
+        cy.userZoomingEnabled(true);
+        cy.boxSelectionEnabled(true);
+        cy.nodes().grabify(); // 노드 드래그 활성화
+      }
+
       setupSimulation(cy);
       
       // 이벤트 리스너 등록
@@ -530,11 +601,31 @@ const GraphComponent: React.FC<GraphComponentProps> = ({
     }
   }, [cy, setupSimulation, handleMouseOver, handleMouseOut, handleMouseMove, handleTapStart, handleGrab, handleDrag, handleFree, handleDblClick]);
 
+  // ==================== 그래프 변경 시 시뮬레이션 재시작 ====================
+  useEffect(() => {
+    if (cy && !isExpanding) {
+      // 그래프가 변경될 때마다 시뮬레이션 재시작 (로딩 중이 아닐 때만)
+      setupSimulation(cy);
+      
+      // 새로운 노드들이 추가되면 화면 중앙으로 맞춤
+      setTimeout(() => {
+        cy.fit(undefined, 50);
+      }, 100); // 시뮬레이션이 시작된 후 약간의 지연을 두고 맞춤
+    }
+  }, [graph.nodes.length, graph.edges.length, cy, setupSimulation, isExpanding]);
+
   // ==================== 스타일 정의 ====================
   const stylesheet = useMemo(() => cytoscapeStyles, []);
 
   const handleCy = useCallback((cyInstance: cytoscape.Core) => { 
-    if (cy !== cyInstance) setCy(cyInstance); 
+    if (cy !== cyInstance) {
+      setCy(cyInstance);
+      
+      // Cytoscape가 준비되면 화면 중앙으로 맞춤
+      cyInstance.ready(() => {
+        cyInstance.fit(undefined, 50); // 50px 패딩으로 모든 노드를 화면 중앙에 맞춤
+      });
+    }
   }, [cy]);
 
   return (
