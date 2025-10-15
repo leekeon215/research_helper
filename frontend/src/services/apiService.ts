@@ -8,8 +8,8 @@ import type {
 } from '../types/api';
 
 // 환경 변수에서 API URL 가져오기
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8002';
-const RAG_SERVER_URL = import.meta.env.VITE_RAG_SERVER_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const RAG_SERVER_URL = import.meta.env.VITE_RAG_SERVER_URL || 'http://localhost:8001';
 
 export class ApiService {
   /**
