@@ -1,8 +1,7 @@
-__pycache__
-/backend/rag_server/uploads
-/backend/rag_server/__pycache__
-/backend/ss_api_server/.env
-/backend/ss_api_server/__pycache__
-/backend/central_server/.env
-/backend/central_server/__pycache__
-/backend/central_server/*/__pycache__
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+uploads

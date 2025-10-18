@@ -10,7 +10,7 @@ from config import Config
 from models import UploadResponse, SimilarityResult, SearchRequest
 from database import db_manager
 from file_handler import file_handler
-from similarity_search import similarity_searcher
+from document_repository import document_repository
 
 # 로깅 설정
 logging.basicConfig(
@@ -104,7 +104,7 @@ async def search_documents(request: SearchRequest):
         logger.info(f"텍스트 검색 요청: {request.query_text[:50]}...")
         
         # 유사도 검색 수행
-        results = similarity_searcher.search_by_text(
+        results = document_repository.search_by_text(
             query_text=request.query_text,
             limit=request.limit,
             distance_threshold=1.0 - request.similarity_threshold
