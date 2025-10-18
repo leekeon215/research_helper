@@ -4,5 +4,4 @@
 __pycache__/
 *.pyc
 
-backend/ss_api_server/.env
 uploads
