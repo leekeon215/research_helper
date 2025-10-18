@@ -11,7 +11,7 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-class SimilaritySearcher:
+class DocumentRepository:
     # 유사도 검색을 수행하는 클래스
     
     def search_by_vector(self, query_vector: List[float], limit: int = None, distance_threshold: float = None) -> List[SimilarityResult]:
@@ -193,4 +193,4 @@ class SimilaritySearcher:
             raise
     
 # 전역 검색기 인스턴스
-similarity_searcher = SimilaritySearcher()
+document_repository = DocumentRepository()
