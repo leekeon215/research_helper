@@ -1,38 +1,51 @@
 # config.py
 import os
 from pathlib import Path
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from dotenv import load_dotenv
 
-class Config:
-    # 시스템 전반의 설정을 관리하는 클래스
-    
+load_dotenv()
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=False)
+
     # Weaviate 설정
-    WEAVIATE_HOST = os.getenv("WEAVIATE_HOST", "localhost")
-    WEAVIATE_PORT = int(os.getenv("WEAVIATE_PORT", 8080))
-    WEAVIATE_GRPC_PORT = int(os.getenv("WEAVIATE_GRPC_PORT", 50051))
-    
+    WEAVIATE_HOST: str = "localhost"
+    WEAVIATE_PORT: int = 8080
+    WEAVIATE_GRPC_PORT: int = 50051
+
     # 임베딩 모델 설정
-    EMBEDDING_MODEL_NAME = "allenai/specter"
-    EMBEDDING_DEVICE = "cpu"
-    NORMALIZE_EMBEDDINGS = True
-    
+    EMBEDDING_MODEL_NAME: str = "allenai/specter"
+    EMBEDDING_DEVICE: str = "cpu"
+    NORMALIZE_EMBEDDINGS: bool = True
+
     # 텍스트 분할 설정
-    CHUNK_SIZE = 1000
-    CHUNK_OVERLAP = 200
-    
+    CHUNK_SIZE: int = 1000
+    CHUNK_OVERLAP: int = 200
+
     # 파일 업로드 설정
-    UPLOAD_DIR = Path("uploads")
-    MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-    ALLOWED_EXTENSIONS = {".txt", ".pdf", ".docx", ".md"}
-    
+    UPLOAD_DIR: Path = Path("uploads")
+    MAX_FILE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    ALLOWED_EXTENSIONS: set[str] = {".txt", ".pdf", ".docx", ".md"}
+
     # 검색 설정
-    DEFAULT_SEARCH_LIMIT = 5
-    DEFAULT_SIMILARITY_THRESHOLD = 0.7
-    
+    DEFAULT_SEARCH_LIMIT: int = 5
+    DEFAULT_SIMILARITY_THRESHOLD: float = 0.7
+
     # FastAPI 설정
-    API_HOST = "0.0.0.0"
-    API_PORT = 8000
-    
-    @classmethod
-    def ensure_upload_dir(cls):
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8001 # RAG 서버 포트 번호
+
+    def ensure_upload_dir(self):
         # 업로드 디렉토리가 존재하는지 확인하고 생성
-        cls.UPLOAD_DIR.mkdir(exist_ok=True)
+        try:
+            upload_dir = Path(self.UPLOAD_DIR)
+            upload_dir.mkdir(exist_ok=True)
+        except Exception as e:
+            raise
+
+# 설정 인스턴스 생성
+settings = Settings()
+
+# 업로드 디렉토리 생성 (인스턴스 생성 후 호출)
+settings.ensure_upload_dir()
