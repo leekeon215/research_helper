@@ -2,7 +2,7 @@
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from typing import List
 import logging
-from config import Config
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -17,11 +17,11 @@ class EmbeddingManager:
         # HuggingFace 임베딩 모델 초기화
         try:
             self.model = HuggingFaceEmbeddings(
-                model_name=Config.EMBEDDING_MODEL_NAME,
-                model_kwargs={'device': Config.EMBEDDING_DEVICE},
-                encode_kwargs={'normalize_embeddings': Config.NORMALIZE_EMBEDDINGS}
+                model_name=settings.EMBEDDING_MODEL_NAME,
+                model_kwargs={'device': settings.EMBEDDING_DEVICE},
+                encode_kwargs={'normalize_embeddings': settings.NORMALIZE_EMBEDDINGS}
             )
-            logger.info(f"임베딩 모델 '{Config.EMBEDDING_MODEL_NAME}' 초기화 완료")
+            logger.info(f"임베딩 모델 '{settings.EMBEDDING_MODEL_NAME}' 초기화 완료")
         except Exception as e:
             logger.error(f"임베딩 모델 초기화 실패: {str(e)}")
             raise
@@ -49,4 +49,9 @@ class EmbeddingManager:
             raise
 
 # 전역 임베딩 매니저 인스턴스
-embedding_manager = EmbeddingManager()
+embedding_manager_instance = EmbeddingManager()
+
+# --- 팩토리 함수 추가 ---
+def get_embedding_manager() -> EmbeddingManager:
+    """FastAPI Depends를 위한 EmbeddingManager 인스턴스 반환 함수"""
+    return embedding_manager_instance

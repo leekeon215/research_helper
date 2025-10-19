@@ -6,7 +6,9 @@ from typing import List, Dict, Any
 
 from core.config import settings
 from core.models import InternalSearchRequest, ExternalSearchRequest, InternalSearchResponse, ExternalSearchResponse
-from services.query_service import QueryService
+from services.query_service import QueryService ,get_query_service
+from services.llm_service import get_llm_service
+from services.similarity_service import get_similarity_service
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -27,9 +29,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 의존성 주입을 위한 서비스 인스턴스
-query_service = QueryService()
-
 @app.get("/")
 async def root():
     return {"message": "중앙 처리 서버가 실행 중입니다."}
@@ -41,7 +40,8 @@ async def search_internal_data(request: InternalSearchRequest):
     """
     try:
         logger.info(f"내부 검색 요청 수신: {request.query_text}")
-        response = await query_service.process_internal_search(request)
+        q_service = get_query_service(llm_service=get_llm_service(), similarity_service=get_similarity_service())
+        response = await q_service.process_internal_search(request)
         return response
     except HTTPException:
         raise
@@ -56,7 +56,8 @@ async def search_external_data(request: ExternalSearchRequest):
     """
     try:
         logger.info(f"외부 검색 요청 수신: {request.query_text}")
-        response = await query_service.process_external_search(request)
+        q_service = get_query_service(llm_service=get_llm_service(), similarity_service=get_similarity_service())
+        response = await q_service.process_external_search(request)
         return response
     except HTTPException:
         raise

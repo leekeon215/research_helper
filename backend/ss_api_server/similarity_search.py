@@ -4,7 +4,7 @@ import logging
 import requests
 from fastapi import HTTPException
 from models import SemanticScholarResult, EmbeddingResult, TldrResult
-from config import Config
+from config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -56,8 +56,8 @@ class SimilaritySearcher:
         }
 
         headers = {}
-        if Config.SEMANTIC_SCHOLAR_API_KEY:
-            headers["x-api-key"] = Config.SEMANTIC_SCHOLAR_API_KEY
+        if settings.SEMANTIC_SCHOLAR_API_KEY:
+            headers["x-api-key"] = settings.SEMANTIC_SCHOLAR_API_KEY
             logger.info("API Key를 사용하여 Semantic Scholar API에 요청합니다.")
         else:
             logger.warning("API Key가 설정되지 않았습니다. 기본 속도 제한이 적용됩니다.")
@@ -93,8 +93,8 @@ class SimilaritySearcher:
             "limit": limit
         }
         headers = {}
-        if Config.SEMANTIC_SCHOLAR_API_KEY:
-            headers["x-api-key"] = Config.SEMANTIC_SCHOLAR_API_KEY
+        if settings.SEMANTIC_SCHOLAR_API_KEY:
+            headers["x-api-key"] = settings.SEMANTIC_SCHOLAR_API_KEY
             logger.info("API Key를 사용하여 추천 논문 요청을 보냅니다.")
         else:
             logger.warning("API Key가 설정되지 않았습니다. 기본 속도 제한이 적용됩니다.")
@@ -117,4 +117,8 @@ class SimilaritySearcher:
             raise HTTPException(status_code=500, detail="추천 논문 처리 중 오류가 발생했습니다")
 
 # 전역 검색기 인스턴스
-similarity_searcher = SimilaritySearcher()
+# similarity_searcher = SimilaritySearcher()
+
+def get_similarity_searcher() -> SimilaritySearcher:
+    """FastAPI Depends를 위한 SimilaritySearcher 인스턴스 반환 함수"""
+    return SimilaritySearcher()

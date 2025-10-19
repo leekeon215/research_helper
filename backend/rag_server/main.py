@@ -6,11 +6,12 @@ import logging
 from typing import List
 from contextlib import asynccontextmanager
 
-from config import Config
+from config import settings
 from models import UploadResponse, SimilarityResult, SearchRequest
-from database import db_manager
+from database import db_manager_instance as db_manager, get_db_manager
+from embeddings import EmbeddingManager, get_embedding_manager
 from file_handler import file_handler
-from document_repository import document_repository
+from document_repository import DocumentRepository, get_repository
 
 # 로깅 설정
 logging.basicConfig(
@@ -28,6 +29,9 @@ async def lifespan(app: FastAPI):
         db_manager.ensure_collection_exists() # 컬렉션이 존재하는지 확인
         logger.info("FastAPI 애플리케이션 시작됨")
         yield
+    except Exception as e:
+        logger.error(f"Error during application startup: {e}", exc_info=True)
+        raise e
     finally:
         # 종료 시
         db_manager.close()
@@ -55,20 +59,6 @@ async def root():
     # 루트 엔드포인트
     return {"message": "RAG 파일 유사도 검색 시스템이 실행 중입니다"}
 
-@app.get("/health")
-async def health_check():
-    # 서비스 상태 확인
-    try:
-        # Weaviate 연결 확인
-        collection = db_manager.get_collection()
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now(),
-            "weaviate_connected": True
-        }
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"서비스 상태 불량: {str(e)}")
-
 @app.post("/upload", response_model=UploadResponse)
 async def upload_file(file: UploadFile = File(...)):
     # 파일 업로드 및 유사도 검색
@@ -76,7 +66,7 @@ async def upload_file(file: UploadFile = File(...)):
         logger.info(f"파일 업로드 요청: {file.filename}")
         
         # 파일 처리 및 DB 저장
-        similar_documents = await file_handler.process_uploaded_file(file)
+        await file_handler.process_uploaded_file(file)
         
         # 응답 생성
         response = UploadResponse(
@@ -103,8 +93,10 @@ async def search_documents(request: SearchRequest):
         
         logger.info(f"텍스트 검색 요청: {request.query_text[:50]}...")
         
+        repo = get_repository(db=get_db_manager(), embedder=get_embedding_manager())
+
         # 유사도 검색 수행
-        results = document_repository.search_by_text(
+        results = repo.search_by_text(
             query_text=request.query_text,
             limit=request.limit,
             distance_threshold=1.0 - request.similarity_threshold
@@ -119,13 +111,34 @@ async def search_documents(request: SearchRequest):
         logger.error(f"텍스트 검색 실패: {str(e)}")
         raise HTTPException(status_code=500, detail="검색 처리 중 오류가 발생했습니다")
 
+@app.get("/health")
+async def health_check():
+    # 서비스 상태 확인
+    try:
+        # Weaviate 연결 확인
+        current_db_manager = get_db_manager() 
+        collection = current_db_manager.get_collection()
+
+        if not current_db_manager.client or not current_db_manager.client.is_connected():
+             raise HTTPException(status_code=503, detail="Weaviate client not connected")
+        if not current_db_manager.client.collections.exists(current_db_manager.collection_name):
+             raise HTTPException(status_code=503, detail=f"Collection '{current_db_manager.collection_name}' not found")
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.now(),
+            "weaviate_connected": True
+        }
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"서비스 상태 불량: {str(e)}")
+
 @app.get("/stats")
 async def get_stats():
     # 시스템 통계 정보
     try:
-        collection = db_manager.get_collection()
-        
-        # 저장된 문서 수 조회
+        current_db_manager = get_db_manager()
+        collection = current_db_manager.get_collection()
+
         result = collection.aggregate.over_all(total_count=True)
         document_count = result.total_count if result.total_count else 0
         
@@ -141,4 +154,4 @@ async def get_stats():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=Config.API_HOST, port=Config.API_PORT)
+    uvicorn.run(app, host=settings.API_HOST, port=settings.API_PORT)

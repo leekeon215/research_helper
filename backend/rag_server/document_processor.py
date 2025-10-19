@@ -7,9 +7,9 @@ from langchain_community.document_loaders import (
 from typing import List, Dict, Any
 import logging
 from pathlib import Path
-from config import Config
-from embeddings import embedding_manager
-from database import db_manager
+from config import settings
+from embeddings import EmbeddingManager, get_embedding_manager
+from database import WeaviateManager, get_db_manager
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +18,8 @@ class DocumentProcessor:
     
     def __init__(self):
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=Config.CHUNK_SIZE,
-            chunk_overlap=Config.CHUNK_OVERLAP,
+            chunk_size=settings.CHUNK_SIZE,
+            chunk_overlap=settings.CHUNK_OVERLAP,
             length_function=len
         )
     
@@ -65,8 +65,12 @@ class DocumentProcessor:
                 }
             
             # Weaviate 컬렉션 가져오기
+            db_manager = get_db_manager()
             collection = db_manager.get_collection()
             
+            # 임베딩 매니저 가져오기
+            embedding_manager = get_embedding_manager()
+        
             # 배치로 청크 저장
             with collection.batch.fixed_size(batch_size=100) as batch:
                 for i, chunk in enumerate(chunks):
@@ -107,6 +111,7 @@ class DocumentProcessor:
         try:
             content = self.load_document(file_path)
             # 전체 내용을 하나의 임베딩으로 변환
+            embedding_manager = get_embedding_manager()
             embedding = embedding_manager.embed_text(content)
             logger.info(f"검색용 파일 처리 완료: {file_path.name}")
             return embedding

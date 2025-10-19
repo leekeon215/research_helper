@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List
 import logging
 from fastapi import UploadFile, HTTPException
-from config import Config
+from config import settings
 from models import SimilarityResult
 from document_processor import document_processor
 
@@ -14,23 +14,23 @@ class FileHandler:
     # 파일 업로드 및 처리를 담당하는 클래스
     
     def __init__(self):
-        Config.ensure_upload_dir()
+        settings.ensure_upload_dir()
     
     def validate_file(self, file: UploadFile) -> None:
         # 업로드된 파일의 유효성 검사
         # 파일 확장자 검사
         file_extension = Path(file.filename).suffix.lower()
-        if file_extension not in Config.ALLOWED_EXTENSIONS:
+        if file_extension not in settings.ALLOWED_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
-                detail=f"지원하지 않는 파일 형식입니다. 허용된 형식: {', '.join(Config.ALLOWED_EXTENSIONS)}"
+                detail=f"지원하지 않는 파일 형식입니다. 허용된 형식: {', '.join(settings.ALLOWED_EXTENSIONS)}"
             )
         
         # 파일 크기 검사 (선택적 - UploadFile에서 size가 None일 수 있음)
-        if hasattr(file, 'size') and file.size and file.size > Config.MAX_FILE_SIZE:
+        if hasattr(file, 'size') and file.size and file.size > settings.MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=400,
-                detail=f"파일 크기가 너무 큽니다. 최대 크기: {Config.MAX_FILE_SIZE / (1024*1024):.1f}MB"
+                detail=f"파일 크기가 너무 큽니다. 최대 크기: {settings.MAX_FILE_SIZE / (1024*1024):.1f}MB"
             )
     
     async def save_uploaded_file(self, file: UploadFile) -> Path:
@@ -39,7 +39,7 @@ class FileHandler:
             # 고유한 파일명 생성
             file_extension = Path(file.filename).suffix
             unique_filename = f"{uuid.uuid4()}{file_extension}"
-            file_path = Config.UPLOAD_DIR / unique_filename
+            file_path = settings.UPLOAD_DIR / unique_filename
             
             # 파일 저장
             content = await file.read()

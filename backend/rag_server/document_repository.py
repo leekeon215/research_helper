@@ -1,28 +1,32 @@
 # rag/similarity_search.py
 from typing import List, Optional
 import logging
-# 필요한 필터 클래스 import 추가
+from fastapi import Depends # Depends 추가
 from weaviate.classes.query import Filter, MetadataQuery
-
 from models import SimilarityResult
-from database import db_manager
-from embeddings import embedding_manager
-from config import Config
+from database import WeaviateManager, get_db_manager
+from embeddings import EmbeddingManager, get_embedding_manager
+from config import settings
 
 logger = logging.getLogger(__name__)
 
 class DocumentRepository:
     # 유사도 검색을 수행하는 클래스
     
+    # --- 생성자 추가하여 의존성 받기 ---
+    def __init__(self, db_manager: WeaviateManager, embedding_manager: EmbeddingManager):
+        self.db_manager = db_manager
+        self.embedding_manager = embedding_manager
+    
     def search_by_vector(self, query_vector: List[float], limit: int = None, distance_threshold: float = None) -> List[SimilarityResult]:
         # 벡터를 이용한 유사도 검색
         if limit is None:
-            limit = Config.DEFAULT_SEARCH_LIMIT
+            limit = settings.DEFAULT_SEARCH_LIMIT
         if distance_threshold is None:
-            distance_threshold = 1.0 - Config.DEFAULT_SIMILARITY_THRESHOLD
+            distance_threshold = 1.0 - settings.DEFAULT_SIMILARITY_THRESHOLD
         
         try:
-            collection = db_manager.get_collection()
+            collection = self.db_manager.get_collection()
             
             # near_vector 검색 수행 (벡터값 반환 옵션 추가)
             response = collection.query.near_vector(
@@ -64,7 +68,7 @@ class DocumentRepository:
         try:
             # 텍스트를 벡터로 변환
             text_to_embed = f"user's question [SEP] {query_text}"
-            query_vector = embedding_manager.embed_text(text_to_embed)
+            query_vector = self.embedding_manager.embed_text(text_to_embed)
             
             # 벡터 검색 수행
             return self.search_by_vector(query_vector, limit, distance_threshold)
@@ -79,10 +83,10 @@ class DocumentRepository:
         논문 제목에 특정 키워드가 포함된 문서를 검색합니다. (부분 일치)
         """
         if limit is None:
-            limit = Config.DEFAULT_SEARCH_LIMIT
+            limit = settings.DEFAULT_SEARCH_LIMIT
 
         try:
-            collection = db_manager.get_collection()
+            collection = self.db_manager.get_collection()
 
             # 'title' 속성에 대해 필터링 수행 (Like 연산자 사용)
             response = collection.query.fetch_objects(
@@ -121,10 +125,10 @@ class DocumentRepository:
         저자명에 특정 키워드가 포함된 문서를 검색합니다. (부분 일치)
         """
         if limit is None:
-            limit = Config.DEFAULT_SEARCH_LIMIT
+            limit = settings.DEFAULT_SEARCH_LIMIT
 
         try:
-            collection = db_manager.get_collection()
+            collection = self.db_manager.get_collection()
 
             # 'authors' 속성에 대해 필터링 수행 (Like 연산자 사용)
             response = collection.query.fetch_objects(
@@ -163,7 +167,7 @@ class DocumentRepository:
         """
         results = []
         try:
-            collection = db_manager.get_collection()
+            collection = self.db_manager.get_collection()
 
             response = collection.query.fetch_objects(
                 limit=limit, # None이면 모든 객체
@@ -193,4 +197,12 @@ class DocumentRepository:
             raise
     
 # 전역 검색기 인스턴스
-document_repository = DocumentRepository()
+# document_repository = DocumentRepository()
+
+# --- 팩토리 함수 추가 ---
+def get_repository(
+    db: WeaviateManager = Depends(get_db_manager),
+    embedder: EmbeddingManager = Depends(get_embedding_manager)
+) -> DocumentRepository:
+    """FastAPI Depends를 위한 DocumentRepository 인스턴스 반환 함수"""
+    return DocumentRepository(db_manager=db, embedding_manager=embedder)
