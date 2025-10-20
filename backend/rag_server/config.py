@@ -3,8 +3,10 @@ import os
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
+import logging # 로깅 추가
 
 load_dotenv()
+logger = logging.getLogger(__name__) # 로거 추가
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=False)
@@ -34,18 +36,24 @@ class Settings(BaseSettings):
 
     # FastAPI 설정
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8001 # RAG 서버 포트 번호
+    API_PORT: int = 8001
 
     def ensure_upload_dir(self):
-        # 업로드 디렉토리가 존재하는지 확인하고 생성
+        """업로드 디렉토리가 존재하는지 확인하고 생성"""
         try:
             upload_dir = Path(self.UPLOAD_DIR)
             upload_dir.mkdir(exist_ok=True)
+            logger.info(f"Upload directory '{upload_dir}' ensured.") # 로그 추가
         except Exception as e:
+            logger.error(f"Failed to ensure upload directory '{self.UPLOAD_DIR}': {e}")
             raise
 
 # 설정 인스턴스 생성
 settings = Settings()
 
 # 업로드 디렉토리 생성 (인스턴스 생성 후 호출)
-settings.ensure_upload_dir()
+try:
+    settings.ensure_upload_dir()
+except Exception as e:
+    logger.critical(f"Could not create upload directory on startup: {e}")
+    # 필요시 여기서 애플리케이션 종료 처리

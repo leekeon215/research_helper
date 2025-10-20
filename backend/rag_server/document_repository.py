@@ -1,208 +1,169 @@
-# rag/similarity_search.py
-from typing import List, Optional
+# rag/document_repository.py
+from typing import List, Optional, Dict, Any
 import logging
-from fastapi import Depends # Depends 추가
 from weaviate.classes.query import Filter, MetadataQuery
 from models import SimilarityResult
 from database import WeaviateManager, get_db_manager
-from embeddings import EmbeddingManager, get_embedding_manager
 from config import settings
+from fastapi import Depends, HTTPException
 
 logger = logging.getLogger(__name__)
 
 class DocumentRepository:
-    # 유사도 검색을 수행하는 클래스
-    
-    # --- 생성자 추가하여 의존성 받기 ---
-    def __init__(self, db_manager: WeaviateManager, embedding_manager: EmbeddingManager):
+    def __init__(self, db_manager: WeaviateManager):
+        if db_manager is None:
+             logger.critical("DatabaseManager dependency is None during DocumentRepository init.")
+             raise ValueError("DatabaseManager instance is required.")
         self.db_manager = db_manager
-        self.embedding_manager = embedding_manager
-    
+        logger.info("DocumentRepository initialized.")
+
+    def store_processed_data(self, data_objects: List[Dict[str, Any]]) -> List[str]:
+        """미리 처리된 데이터 객체(속성 + 벡터 포함) 리스트를 Weaviate에 배치 저장합니다."""
+        if not data_objects:
+            logger.warning("No processed data objects provided for storage.")
+            return []
+
+        try:
+            collection = self.db_manager.get_collection() 
+            object_ids = []
+            doc_title = data_objects[0].get('title', 'Unknown Document') if data_objects else 'Empty Batch'
+
+            logger.info(f"Starting batch storage for {len(data_objects)} objects from document '{doc_title}'...")
+
+            with collection.batch.fixed_size(batch_size=100) as batch:
+                for data_object in data_objects:
+                    try:
+                        properties = {k: v for k, v in data_object.items() if k != 'vector'}
+                        vector = data_object.get('vector')
+
+                        if not vector or not isinstance(vector, list):
+                            logger.warning(f"Skipping chunk {properties.get('chunk_index')} for '{doc_title}' due to missing or invalid vector.")
+                            continue
+
+                        batch.add_object(
+                            properties=properties,
+                            vector=vector
+                        )
+                    
+                        object_ids.append(f"{properties.get('doi', 'unknown_doi')}_{properties.get('chunk_index', -1)}")
+
+                    except Exception as e:
+                        chunk_index = data_object.get('chunk_index', 'N/A') # Access directly
+                        logger.error(f"Failed to add chunk {chunk_index} for '{doc_title}' to batch: {str(e)}", exc_info=True)
+                        continue # Skip failed chunk
+
+            logger.info(f"Batch storage completed for document '{doc_title}'. Added {len(object_ids)} items to batch.")
+            return object_ids
+
+        except Exception as e:
+            logger.error(f"Failed to store processed data for document '{doc_title}': {str(e)}", exc_info=True)
+            raise RuntimeError(f"Database storage failed for {doc_title}") from e
+
     def search_by_vector(self, query_vector: List[float], limit: int = None, distance_threshold: float = None) -> List[SimilarityResult]:
-        # 벡터를 이용한 유사도 검색
-        if limit is None:
-            limit = settings.DEFAULT_SEARCH_LIMIT
-        if distance_threshold is None:
-            distance_threshold = 1.0 - settings.DEFAULT_SIMILARITY_THRESHOLD
-        
+        if limit is None: limit = settings.DEFAULT_SEARCH_LIMIT
+        effective_distance = distance_threshold if distance_threshold is not None else (1.0 - settings.DEFAULT_SIMILARITY_THRESHOLD)
         try:
             collection = self.db_manager.get_collection()
-            
-            # near_vector 검색 수행 (벡터값 반환 옵션 추가)
             response = collection.query.near_vector(
-                near_vector=query_vector,
-                limit=limit,
-                distance=distance_threshold,
-                return_metadata=["distance"],
-                include_vector=True  # 벡터값 반환
+                near_vector=query_vector, limit=limit, distance=effective_distance,
+                return_metadata=MetadataQuery(distance=True),
+                return_properties=["title", "content", "authors", "published", "doi", "chunk_index"],
+                include_vector=True
             )
-            
             results = []
             for obj in response.objects:
-                # 거리를 유사도로 변환 (거리가 작을수록 유사도가 높음)
-                distance = obj.metadata.distance if obj.metadata.distance is not None else 1.0
+                distance = obj.metadata.distance if obj.metadata and obj.metadata.distance is not None else 1.0
                 similarity_score = 1.0 - distance
-                
-                result = SimilarityResult(
-                    title=obj.properties.get("title", ""),
-                    content=obj.properties.get("content", ""),
-                    authors=obj.properties.get("authors", ""),
-                    published=obj.properties.get("published"),
-                    doi=obj.properties.get("doi", ""),
-                    similarity_score=similarity_score,
-                    distance=distance,
-                    vector=obj.vector.get("default") if obj.vector else None, # 벡터값 할당
+                results.append(SimilarityResult(
+                    title=obj.properties.get("title", ""), content=obj.properties.get("content", ""),
+                    authors=obj.properties.get("authors", ""), published=obj.properties.get("published"),
+                    doi=obj.properties.get("doi", ""), similarity_score=similarity_score, distance=distance,
+                    vector=obj.vector.get("default") if obj.vector else None,
                     chunk_index=obj.properties.get("chunk_index")
-                )
-                results.append(result)
-            
-            logger.info(f"벡터 검색 완료: {len(results)}개 결과 반환")
+                ))
+            logger.info(f"Vector search completed: {len(results)} results found.")
             return results
-            
         except Exception as e:
-            logger.error(f"벡터 검색 실패: {str(e)}")
-            raise
-    
-    def search_by_text(self, query_text: str, limit: int = None, distance_threshold: float = None) -> List[SimilarityResult]:
-        # 텍스트를 이용한 유사도 검색
-        try:
-            # 텍스트를 벡터로 변환
-            text_to_embed = f"user's question [SEP] {query_text}"
-            query_vector = self.embedding_manager.embed_text(text_to_embed)
-            
-            # 벡터 검색 수행
-            return self.search_by_vector(query_vector, limit, distance_threshold)
-            
-        except Exception as e:
-            logger.error(f"텍스트 검색 실패: {str(e)}")
-            raise
+            logger.error(f"Vector search failed: {str(e)}", exc_info=True)
+            raise RuntimeError("Database vector search failed") from e
 
-    # --- 제목으로 검색 ---
     def search_by_title(self, title_query: str, limit: int = None) -> List[SimilarityResult]:
-        """
-        논문 제목에 특정 키워드가 포함된 문서를 검색합니다. (부분 일치)
-        """
-        if limit is None:
-            limit = settings.DEFAULT_SEARCH_LIMIT
-
+        if limit is None: limit = settings.DEFAULT_SEARCH_LIMIT
         try:
             collection = self.db_manager.get_collection()
-
-            # 'title' 속성에 대해 필터링 수행 (Like 연산자 사용)
             response = collection.query.fetch_objects(
-                limit=limit,
-                filters=Filter.by_property("title").like(f"*{title_query}*"), # 부분 일치 검색
+                limit=limit, filters=Filter.by_property("title").like(f"*{title_query}*"),
                 return_properties=["title", "content", "authors", "published", "doi", "chunk_index"],
-                include_vector=True # 벡터값도 반환
+                include_vector=True
             )
-
             results = []
             for obj in response.objects:
-                # 필터 검색 결과에는 distance/similarity가 없으므로 기본값 또는 None 처리
-                result = SimilarityResult(
-                    title=obj.properties.get("title", ""),
-                    content=obj.properties.get("content", ""),
-                    authors=obj.properties.get("authors", ""),
-                    published=obj.properties.get("published"),
-                    doi=obj.properties.get("doi", ""),
-                    similarity_score=0.0, # 필터 검색이므로 유사도 점수는 0 또는 None
-                    distance=1.0,         # 필터 검색이므로 거리는 최대값 또는 None
+                 results.append(SimilarityResult(
+                    title=obj.properties.get("title", ""), content=obj.properties.get("content", ""),
+                    authors=obj.properties.get("authors", ""), published=obj.properties.get("published"),
+                    doi=obj.properties.get("doi", ""), similarity_score=0.0, distance=1.0,
                     vector=obj.vector.get("default") if obj.vector else None,
                     chunk_index=obj.properties.get("chunk_index")
-                )
-                results.append(result)
-
-            logger.info(f"제목 검색 완료 ('{title_query}'): {len(results)}개 결과 반환")
+                ))
+            logger.info(f"Title search completed ('{title_query}'): {len(results)} results found.")
             return results
-
         except Exception as e:
-            logger.error(f"제목 검색 실패: {str(e)}")
-            raise
+            logger.error(f"Title search failed: {str(e)}", exc_info=True)
+            raise RuntimeError("Database title search failed") from e
 
-    # --- 저자명으로 검색 ---
     def search_by_authors(self, author_query: str, limit: int = None) -> List[SimilarityResult]:
-        """
-        저자명에 특정 키워드가 포함된 문서를 검색합니다. (부분 일치)
-        """
-        if limit is None:
-            limit = settings.DEFAULT_SEARCH_LIMIT
-
+        if limit is None: limit = settings.DEFAULT_SEARCH_LIMIT
         try:
             collection = self.db_manager.get_collection()
-
-            # 'authors' 속성에 대해 필터링 수행 (Like 연산자 사용)
             response = collection.query.fetch_objects(
-                limit=limit,
-                filters=Filter.by_property("authors").like(f"*{author_query}*"), # 부분 일치 검색
+                limit=limit, filters=Filter.by_property("authors").like(f"*{author_query}*"),
                 return_properties=["title", "content", "authors", "published", "doi", "chunk_index"],
-                include_vector=True # 벡터값도 반환
+                include_vector=True
             )
-
             results = []
             for obj in response.objects:
-                result = SimilarityResult(
-                    title=obj.properties.get("title", ""),
-                    content=obj.properties.get("content", ""),
-                    authors=obj.properties.get("authors", ""),
-                    published=obj.properties.get("published"),
-                    doi=obj.properties.get("doi", ""),
-                    similarity_score=0.0,
-                    distance=1.0,
+                results.append(SimilarityResult(
+                    title=obj.properties.get("title", ""), content=obj.properties.get("content", ""),
+                    authors=obj.properties.get("authors", ""), published=obj.properties.get("published"),
+                    doi=obj.properties.get("doi", ""), similarity_score=0.0, distance=1.0,
                     vector=obj.vector.get("default") if obj.vector else None,
                     chunk_index=obj.properties.get("chunk_index")
-                )
-                results.append(result)
-
-            logger.info(f"저자 검색 완료 ('{author_query}'): {len(results)}개 결과 반환")
+                ))
+            logger.info(f"Author search completed ('{author_query}'): {len(results)} results found.")
             return results
-
         except Exception as e:
-            logger.error(f"저자 검색 실패: {str(e)}")
-            raise
+            logger.error(f"Author search failed: {str(e)}", exc_info=True)
+            raise RuntimeError("Database author search failed") from e
 
     def get_all_documents(self, limit: Optional[int] = None) -> List[SimilarityResult]:
-        """
-        Weaviate DB에 저장된 모든 문서(청크) 데이터를 조회합니다.
-        limit 파라미터로 가져올 최대 개수를 지정할 수 있습니다. (기본값: 제한 없음)
-        """
         results = []
         try:
             collection = self.db_manager.get_collection()
-
             response = collection.query.fetch_objects(
-                limit=limit, # None이면 모든 객체
+                limit=limit,
                 return_properties=["title", "content", "authors", "published", "doi", "chunk_index"],
-                include_vector=True # 벡터값도 포함
+                include_vector=True
             )
-
             for obj in response.objects:
-                result = SimilarityResult(
-                    title=obj.properties.get("title", ""),
-                    content=obj.properties.get("content", ""),
-                    authors=obj.properties.get("authors", ""),
-                    published=obj.properties.get("published"),
-                    doi=obj.properties.get("doi", ""),
-                    similarity_score=0.0, # 전체 조회이므로 유사도/거리 의미 없음
-                    distance=1.0,
+                results.append(SimilarityResult(
+                    title=obj.properties.get("title", ""), content=obj.properties.get("content", ""),
+                    authors=obj.properties.get("authors", ""), published=obj.properties.get("published"),
+                    doi=obj.properties.get("doi", ""), similarity_score=0.0, distance=1.0,
                     vector=obj.vector.get("default") if obj.vector else None,
                     chunk_index=obj.properties.get("chunk_index")
-                )
-                results.append(result)
-
-            logger.info(f"모든 문서 조회 완료: 총 {len(results)}개 결과 반환 (limit: {limit})")
+                ))
+            logger.info(f"Fetched all documents: {len(results)} results found (limit: {limit}).")
             return results
-
         except Exception as e:
-            logger.error(f"모든 문서 조회 실패: {str(e)}")
-            raise
-    
-# 전역 검색기 인스턴스
-# document_repository = DocumentRepository()
+            logger.error(f"Failed to fetch all documents: {str(e)}", exc_info=True)
+            raise RuntimeError("Database fetch all documents failed") from e
 
-# --- 팩토리 함수 추가 ---
+
+# --- 팩토리 함수 ---
 def get_repository(
-    db: WeaviateManager = Depends(get_db_manager),
-    embedder: EmbeddingManager = Depends(get_embedding_manager)
+    db: WeaviateManager = Depends(get_db_manager)
 ) -> DocumentRepository:
     """FastAPI Depends를 위한 DocumentRepository 인스턴스 반환 함수"""
-    return DocumentRepository(db_manager=db, embedding_manager=embedder)
+    if db is None:
+         raise HTTPException(status_code=503, detail="Database Manager is unavailable")
+    return DocumentRepository(db_manager=db)
