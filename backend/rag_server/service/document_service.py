@@ -1,4 +1,4 @@
-# services/document_service.py
+# service/document_service.py
 import logging
 from typing import List, Optional
 from fastapi import Depends, HTTPException
@@ -6,11 +6,11 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # 필요한 모델, 리포지토리, 서비스 및 팩토리 함수 임포트
-from models.models import SimilarityResult
+from models.schemas import SimilarityResult
 from repository.document_repository import DocumentRepository, get_repository
-from services.loader_service import DocumentLoaderService, get_loader_service
-from services.splitter_service import TextSplitterService, get_splitter_service
-from services.embedding_service import EmbeddingService, get_embedding_service
+from utils.document_loader import DocumentLoader, get_document_loader
+from utils.text_splitter import TextSplitter, get_splitter_service
+from utils.embedder import Embedder, get_embedder
 from core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -22,9 +22,9 @@ class DocumentService:
     """
     def __init__(self,
                  repository: DocumentRepository,
-                 loader: DocumentLoaderService,
-                 splitter: TextSplitterService,
-                 embedder: EmbeddingService):
+                 loader: DocumentLoader,
+                 splitter: TextSplitter,
+                 embedder: Embedder):
         
         if not all([repository, loader, splitter, embedder]):
              logger.critical("One or more dependencies are None during DocumentService init.")
@@ -163,9 +163,9 @@ class DocumentService:
 # --- 팩토리 함수 ---
 def get_document_service(
     repo: DocumentRepository = Depends(get_repository),
-    loader: DocumentLoaderService = Depends(get_loader_service),
-    splitter: TextSplitterService = Depends(get_splitter_service),
-    embedder: EmbeddingService = Depends(get_embedding_service)
+    loader: DocumentLoader = Depends(get_document_loader),
+    splitter: TextSplitter = Depends(get_splitter_service),
+    embedder: Embedder = Depends(get_embedder)
 ) -> DocumentService:
     """FastAPI Depends를 위한 DocumentService 인스턴스 반환 함수"""
     if not all([repo, loader, splitter, embedder]):

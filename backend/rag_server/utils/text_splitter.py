@@ -1,4 +1,4 @@
-# services/splitter_service.py
+# utils/text_splitter.py
 import logging
 from typing import List
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -6,8 +6,8 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-class TextSplitterService:
-    """텍스트를 청크로 분할하는 서비스"""
+class TextSplitter:
+    """텍스트를 청크로 분할하는 컴포넌트"""
 
     def __init__(self):
         try:
@@ -16,7 +16,7 @@ class TextSplitterService:
                 chunk_overlap=settings.CHUNK_OVERLAP,
                 length_function=len,
             )
-            logger.info(f"TextSplitterService initialized with chunk_size={settings.CHUNK_SIZE}, chunk_overlap={settings.CHUNK_OVERLAP}")
+            logger.info(f"TextSplitter initialized with chunk_size={settings.CHUNK_SIZE}, chunk_overlap={settings.CHUNK_OVERLAP}")
         except Exception as e:
             logger.critical(f"Failed to initialize RecursiveCharacterTextSplitter: {e}", exc_info=True)
             raise RuntimeError(f"Failed to initialize text splitter: {e}") from e
@@ -30,20 +30,17 @@ class TextSplitterService:
         try:
             chunks = self.text_splitter.split_text(text)
             logger.info(f"Split text into {len(chunks)} chunks.")
-            # Optional: Log first few chars of first chunk for debugging
             # if chunks: logger.debug(f"First chunk starts with: {chunks[0][:50]}...")
             return chunks
         except Exception as e:
-            # Catch potential errors during splitting
             logger.error(f"Failed to split text: {str(e)}", exc_info=True)
-            # Re-raise the exception to be handled upstream
             raise RuntimeError("Failed during text splitting") from e
 
 # --- 팩토리 함수 추가 ---
-splitter_service_instance = TextSplitterService()
+splitter_instance = TextSplitter()
 
-def get_splitter_service() -> TextSplitterService:
-    """FastAPI Depends를 위한 TextSplitterService 인스턴스 반환 함수"""
-    if splitter_service_instance is None:
-         raise RuntimeError("TextSplitterService failed to initialize.")
-    return splitter_service_instance
+def get_splitter_service() -> TextSplitter:
+    """FastAPI Depends를 위한 TextSplitter 인스턴스 반환 함수"""
+    if splitter_instance is None:
+         raise RuntimeError("TextSplitter failed to initialize.")
+    return splitter_instance

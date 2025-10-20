@@ -1,28 +1,28 @@
-# services/embedding_service.py
+# utils/embedder.py
 import logging
 from typing import List
-from fastapi import Depends, HTTPException
+from fastapi import HTTPException
 from langchain_huggingface import HuggingFaceEmbeddings
 from core.config import settings
 
 logger = logging.getLogger(__name__)
 
-class EmbeddingService:
+class Embedder:
     """
-    텍스트 임베딩 생성을 담당하는 서비스.
-    HuggingFace 모델을 직접 로드하고 관리합니다.
+    텍스트 임베딩 생성을 담당하는 컴포넌트.
+    HuggingFace 모델을 직접 로드하고 관리.
     """
 
     def __init__(self):
         self.model: HuggingFaceEmbeddings | None = None
-        logger.info("Initializing EmbeddingService...")
+        logger.info("Initializing Embedder...")
         try:
             self._initialize_model()
         except Exception as e:
-            logger.critical(f"Fatal error initializing EmbeddingService model: {e}", exc_info=True)
+            logger.critical(f"Fatal error initializing Embedder: {e}", exc_info=True)
             # 초기화 실패 시 인스턴스 생성이 실패하도록 예외 발생
             raise RuntimeError(f"Failed to initialize embedding model: {e}") from e
-        logger.info("EmbeddingService initialized successfully.")
+        logger.info("Embedder initialized successfully.")
 
     def _initialize_model(self) -> None:
         """HuggingFace 임베딩 모델을 초기화합니다."""
@@ -79,16 +79,16 @@ class EmbeddingService:
             raise RuntimeError("Bulk embedding generation failed") from e
 
 # --- 전역 인스턴스 생성 및 팩토리 함수 ---
-# EmbeddingService는 초기화 시 모델을 로드하므로 싱글톤으로 관리
+# Embedder는 초기화 시 모델을 로드하므로 싱글톤으로 관리
 try:
-    embedding_service_instance = EmbeddingService()
+    embedder_instance = Embedder()
 except RuntimeError as e:
-     logger.critical(f"Could not create EmbeddingService instance on startup: {e}")
-     embedding_service_instance = None # 실패 시 None으로 설정
+     logger.critical(f"Could not create Embedder instance on startup: {e}")
+     embedder_instance = None # 실패 시 None으로 설정
 
-def get_embedding_service() -> EmbeddingService:
-    """FastAPI Depends를 위한 EmbeddingService 인스턴스 반환 함수"""
-    if embedding_service_instance is None:
+def get_embedder() -> Embedder:
+    """FastAPI Depends를 위한 Embedder 인스턴스 반환 함수"""
+    if embedder_instance is None:
         # 초기화 실패 시 에러 발생
-        raise HTTPException(status_code=503, detail="Embedding service is unavailable.")
-    return embedding_service_instance
+        raise HTTPException(status_code=503, detail="Embedder is unavailable.")
+    return embedder_instance

@@ -2,7 +2,7 @@
 from typing import List, Optional, Dict, Any
 import logging
 from weaviate.classes.query import Filter, MetadataQuery
-from models.models import SimilarityResult
+from models.schemas import SimilarityResult
 from database.weaviate_db import WeaviateManager, get_db_manager
 from core.config import settings
 from fastapi import Depends, HTTPException
