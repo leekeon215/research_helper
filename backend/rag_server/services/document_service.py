@@ -6,12 +6,12 @@ from pathlib import Path
 from datetime import datetime, timezone
 
 # 필요한 모델, 리포지토리, 서비스 및 팩토리 함수 임포트
-from models import SimilarityResult
-from document_repository import DocumentRepository, get_repository
+from models.models import SimilarityResult
+from repository.document_repository import DocumentRepository, get_repository
 from services.loader_service import DocumentLoaderService, get_loader_service
 from services.splitter_service import TextSplitterService, get_splitter_service
 from services.embedding_service import EmbeddingService, get_embedding_service
-from config import settings
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ import logging
 from fastapi import UploadFile, HTTPException
 
 # config import
-from backend.rag_server.core.config import settings
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 

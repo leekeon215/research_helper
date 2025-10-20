@@ -3,7 +3,7 @@ import weaviate
 from weaviate.classes.config import Configure, Property, DataType
 from typing import Optional
 import logging
-from backend.rag_server.core.config import settings
+from core.config import settings
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)

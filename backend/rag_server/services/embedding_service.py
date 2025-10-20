@@ -3,7 +3,7 @@ import logging
 from typing import List
 from fastapi import Depends, HTTPException
 from langchain_huggingface import HuggingFaceEmbeddings
-from backend.rag_server.core.config import settings
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 
