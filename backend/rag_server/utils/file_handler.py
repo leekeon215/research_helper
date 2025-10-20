@@ -1,11 +1,11 @@
-# file_handler.py
+# utils/file_handler.py
 import uuid
 from pathlib import Path
 import logging
 from fastapi import UploadFile, HTTPException
 
 # config import
-from config import settings
+from backend.rag_server.core.config import settings
 
 logger = logging.getLogger(__name__)
 

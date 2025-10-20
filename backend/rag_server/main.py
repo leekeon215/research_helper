@@ -7,10 +7,10 @@ from typing import List
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from config import settings
-from models import UploadResponse, SimilarityResult, SearchRequest
-from database import db_manager_instance as db_manager, get_db_manager, WeaviateManager
-from file_handler import FileHandler, get_file_handler
+from backend.rag_server.core.config import settings
+from backend.rag_server.models.models import UploadResponse, SimilarityResult, SearchRequest
+from backend.rag_server.database.weaviate_db import db_manager_instance as db_manager, get_db_manager, WeaviateManager
+from backend.rag_server.utils.file_handler import FileHandler, get_file_handler
 from services.document_service import DocumentService, get_document_service
 
 # 로깅 설정

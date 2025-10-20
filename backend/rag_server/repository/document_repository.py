@@ -1,10 +1,10 @@
-# rag/document_repository.py
+# repository/document_repository.py
 from typing import List, Optional, Dict, Any
 import logging
 from weaviate.classes.query import Filter, MetadataQuery
-from models import SimilarityResult
-from database import WeaviateManager, get_db_manager
-from config import settings
+from backend.rag_server.models.models import SimilarityResult
+from backend.rag_server.database.weaviate_db import WeaviateManager, get_db_manager
+from backend.rag_server.core.config import settings
 from fastapi import Depends, HTTPException
 
 logger = logging.getLogger(__name__)

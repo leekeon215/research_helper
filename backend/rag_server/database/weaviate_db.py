@@ -1,9 +1,9 @@
-# database.py
+# database/weaviate_db.py
 import weaviate
 from weaviate.classes.config import Configure, Property, DataType
 from typing import Optional
 import logging
-from config import settings
+from backend.rag_server.core.config import settings
 from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)

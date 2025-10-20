@@ -1,4 +1,4 @@
-# config.py
+# core/config.py
 import os
 from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
