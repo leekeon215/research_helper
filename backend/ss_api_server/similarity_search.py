@@ -1,16 +1,19 @@
 # similarity_search.py
 from typing import List, Dict, Any
 import logging
-import requests
-from fastapi import HTTPException
+from fastapi import HTTPException, Depends
 from models import SemanticScholarResult, EmbeddingResult, TldrResult
 from config import settings
+from client import SemanticScholarClient, get_semantic_scholar_client
 
 logger = logging.getLogger(__name__)
 
 class SimilaritySearcher:
     # 유사도 검색을 수행하는 클래스
     
+    def __init__(self, client: SemanticScholarClient):
+        self.client = client
+        
     def _parse_paper_data(self, paper: Dict[str, Any]) -> SemanticScholarResult:
         """API 응답 딕셔너리를 SemanticScholarResult 모델로 변환하는 헬퍼 함수"""
         pdf_url = None
@@ -45,80 +48,71 @@ class SimilaritySearcher:
         """
         Semantic Scholar API를 사용하여 텍스트 기반 논문 검색을 수행합니다.
         """
-        api_url = "https://api.semanticscholar.org/graph/v1/paper/search"
-        params = {
-            "query": query_text,
-            "limit": limit,
-            "fields": "paperId,title,abstract,authors,publicationDate,openAccessPdf,embedding,tldr,citationCount,venue,fieldsOfStudy",
-            "openAccessPdf": "",
-            "publicationDateOrYear": "2022:",
-            "sort": "publicationDate:desc",
-        }
-
-        headers = {}
-        if settings.SEMANTIC_SCHOLAR_API_KEY:
-            headers["x-api-key"] = settings.SEMANTIC_SCHOLAR_API_KEY
-            logger.info("API Key를 사용하여 Semantic Scholar API에 요청합니다.")
-        else:
-            logger.warning("API Key가 설정되지 않았습니다. 기본 속도 제한이 적용됩니다.")
+        # API 호출에 필요한 파라미터 정의
+        search_fields = [
+            "paperId", "title", "abstract", "authors", "publicationDate",
+            "openAccessPdf", "embedding", "tldr", "citationCount", "venue", "fieldsOfStudy"
+        ]
+        sort_order = "publicationDate:desc"
 
         try:
-            response = requests.get(api_url, params=params, headers=headers)
-            response.raise_for_status()
-            data = response.json().get("data", [])
-            
-            if len(data) > limit:
-                logger.warning(f"API가 {len(data)}개의 결과를 반환했습니다. {limit}개로 제한합니다.")
-                data = data[:limit]
+            # 1. Client를 사용하여 API 호출
+            papers_data = self.client.search_papers(
+                query=query_text,
+                limit=limit,
+                fields=search_fields,
+                sort=sort_order
+            )
 
-            results = [self._parse_paper_data(paper) for paper in data]
+            # 2. 결과 파싱
+            if len(papers_data) > limit:
+                logger.warning(f"API가 {len(papers_data)}개의 결과를 반환했습니다. {limit}개로 제한합니다.")
+                papers_data = papers_data[:limit]
+
+            results = [self._parse_paper_data(paper) for paper in papers_data]
             
             logger.info(f"Semantic Scholar API 검색 완료: {len(results)}개 결과 반환")
             return results
             
-        except requests.exceptions.HTTPError as err:
-            logger.error(f"HTTP 오류 발생: {err.response.status_code} - {err.response.text}")
-            raise HTTPException(status_code=500, detail="Semantic Scholar API 호출 중 오류가 발생했습니다")
+        except HTTPException:
+             # Client에서 발생한 HTTPException은 그대로 다시 발생
+             raise
         except Exception as e:
-            logger.error(f"API 검색 실패: {str(e)}")
-            raise HTTPException(status_code=500, detail="검색 처리 중 오류가 발생했습니다")
+            # 파싱 과정 등에서 발생한 예외 처리
+            logger.error(f"API 검색 결과 처리 실패: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"검색 결과 처리 중 오류 발생: {str(e)}")
 
     def get_recommendations_by_paper_id(self, paper_id: str, limit: int) -> List[SemanticScholarResult]:
         """
         Semantic Scholar Recommendations API를 사용해 특정 논문 기반 추천 논문 리스트 조회
         """
-        api_url = f"https://api.semanticscholar.org/recommendations/v1/papers/forpaper/{paper_id}"
-        params = {
-            "fields": "paperId,title,abstract,authors,year,url,openAccessPdf",
-            "limit": limit
-        }
-        headers = {}
-        if settings.SEMANTIC_SCHOLAR_API_KEY:
-            headers["x-api-key"] = settings.SEMANTIC_SCHOLAR_API_KEY
-            logger.info("API Key를 사용하여 추천 논문 요청을 보냅니다.")
-        else:
-            logger.warning("API Key가 설정되지 않았습니다. 기본 속도 제한이 적용됩니다.")
-
+        rec_fields = ["paperId", "title", "abstract", "authors", "year", "url", "openAccessPdf"]
+        
         try:
-            response = requests.get(api_url, params=params, headers=headers)
-            response.raise_for_status()
-            data = response.json().get("recommendedPapers", [])
+            # 1. Client를 사용하여 API 호출
+            papers_data = self.client.get_recommendations(
+                paper_id=paper_id,
+                limit=limit,
+                fields=rec_fields
+            )
 
-            results = [self._parse_paper_data(paper) for paper in data]
+            # 2. 결과 파싱
+            results = [self._parse_paper_data(paper) for paper in papers_data]
 
             logger.info(f"추천 논문 검색 완료: {len(results)}개 결과")
             return results
             
-        except requests.exceptions.HTTPError as err:
-            logger.error(f"HTTP 오류 발생: {err.response.status_code} - {err.response.text}")
-            raise HTTPException(status_code=500, detail="Semantic Scholar Recommendations API 호출 중 오류가 발생했습니다")
+        except HTTPException:
+             # Client에서 발생한 HTTPException은 그대로 다시 발생
+             raise
         except Exception as e:
-            logger.error(f"API 추천 검색 실패: {str(e)}")
-            raise HTTPException(status_code=500, detail="추천 논문 처리 중 오류가 발생했습니다")
+            # 파싱 과정 등에서 발생한 예외 처리
+            logger.error(f"API 추천 검색 실패: {str(e)}", exc_info=True)
+            raise HTTPException(status_code=500, detail=f"추천 논문 처리 중 오류 발생: {str(e)}")
 
-# 전역 검색기 인스턴스
-# similarity_searcher = SimilaritySearcher()
-
-def get_similarity_searcher() -> SimilaritySearcher:
+# --- 팩토리 함수 ---
+def get_similarity_searcher(
+        client: SemanticScholarClient = Depends(get_semantic_scholar_client)
+) -> SimilaritySearcher:
     """FastAPI Depends를 위한 SimilaritySearcher 인스턴스 반환 함수"""
-    return SimilaritySearcher()
+    return SimilaritySearcher(client=client)
