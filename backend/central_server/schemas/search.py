@@ -1,17 +1,13 @@
-# core/models.py
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
-class InternalSearchRequest(BaseModel):
-    """내부 검색을 위한 요청 모델"""
-    query_text: str = Field(..., description="사용자의 검색 질문 또는 쿼리")
-    limit: int = Field(5, description="반환받을 최대 문서 청크 수")
-    similarity_threshold: float = Field(0.1, description="유사도 검색 시 사용할 임계값")
+#공통부
 
-class ExternalSearchRequest(BaseModel):
-    """외부 검색을 위한 요청 모델"""
-    query_text: str = Field(..., description="사용자의 검색 질문 또는 쿼리")
-    limit: int = Field(5, description="반환받을 최대 논문 수")
+class ChunkReference(BaseModel):
+    """검색된 개별 청크의 상세 정보를 담는 모델"""
+    chunk_content: str = Field(..., description="검색된 청크의 원문 내용")
+    chunk_index: int = Field(..., description="문서 내 청크의 순서 (0부터 시작)")
+    similarity_score: float = Field(..., description="사용자 질문과의 벡터 유사도 점수")
 
 class SimilarityLink(BaseModel):
     """두 문서 간의 유사도 관계(그래프의 엣지)를 나타내는 모델"""
@@ -19,13 +15,13 @@ class SimilarityLink(BaseModel):
     target: str = Field(..., description="타겟 노드의 문서 ID")
     similarity: float = Field(..., description="두 문서 간의 코사인 유사도 점수")
 
-# --- 내부 검색 전용 모델 ---
+#내부검색
 
-class ChunkReference(BaseModel):
-    """검색된 개별 청크의 상세 정보를 담는 모델"""
-    chunk_content: str = Field(..., description="검색된 청크의 원문 내용")
-    chunk_index: int = Field(..., description="문서 내 청크의 순서 (0부터 시작)")
-    similarity_score: float = Field(..., description="사용자 질문과의 벡터 유사도 점수")
+class InternalSearchRequest(BaseModel):
+    """내부 검색을 위한 요청 모델"""
+    query_text: str = Field(..., description="사용자의 검색 질문 또는 쿼리")
+    limit: int = Field(5, description="반환받을 최대 문서 청크 수")
+    similarity_threshold: float = Field(0.1, description="유사도 검색 시 사용할 임계값")
 
 class InternalDocumentReference(BaseModel):
     """그룹화된 내부 문서 참조 모델"""
@@ -41,9 +37,14 @@ class InternalSearchResponse(BaseModel):
     answer: str = Field(..., description="LLM이 생성한 최종 답변 (Markdown 형식)")
     references: List[InternalDocumentReference] = Field(..., description="답변의 근거가 된 내부 문서 및 청크 목록")
     similarity_graph: List[SimilarityLink] = Field(..., description="참고 문헌 간의 유사도 관계 그래프")
+    
+#외부검색    
 
-# --- 외부 검색 전용 모델 ---
-
+class ExternalSearchRequest(BaseModel):
+    """외부 검색을 위한 요청 모델"""
+    query_text: str = Field(..., description="사용자의 검색 질문 또는 쿼리")
+    limit: int = Field(5, description="반환받을 최대 논문 수")
+    
 class ExternalReference(BaseModel):
     """외부 논문 검색 결과를 위한 Reference 모델"""
     paper_id: str = Field(..., description="Semantic Scholar의 논문 고유 ID")

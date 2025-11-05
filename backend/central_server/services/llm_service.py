@@ -1,7 +1,7 @@
 # services/llm_service.py
 import logging
 from openai import AsyncOpenAI
-from core.config import settings
+from central_server.core.config import settings
 
 logger = logging.getLogger(__name__)
 
