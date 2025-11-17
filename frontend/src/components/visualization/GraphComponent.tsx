@@ -239,9 +239,7 @@ const GraphComponent: React.FC<GraphComponentProps> = ({
       .map(edge => ({
         source: edge.source,
         target: edge.target,
-        // --- ⭐️ 6. edge.score -> edge.similarity ---
         score: edge.similarity,
-        // --- ⭐️ ---
         type: edge.type
       }));
     
