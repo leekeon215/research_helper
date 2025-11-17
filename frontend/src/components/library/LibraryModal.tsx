@@ -41,16 +41,16 @@ const LibraryModal: React.FC<LibraryModalProps> = ({
 
     try {
       // Mock 파일 업로드 - 실제 API 연동 시 교체 예정
-      const mockPaper: Omit<LibraryPaper, 'id' | 'uploaded_at'> = {
+      const mockPaper: Omit<LibraryPaper, 'id' | 'uploadedAt'> = {
         title: file.name.replace(/\.[^/.]+$/, ''),
         authors: [{ name: 'Unknown Author' }],
         type: 'paper',
-        publication_date: new Date().toISOString().split('T')[0],
+        publicationDate: new Date().toISOString().split('T')[0],
         venue: 'Uploaded Document',
         abstract: 'This is an uploaded document. Abstract will be extracted automatically.',
-        fields_of_study: ['Computer Science'],
-        file_path: file.name,
-        is_seed: false
+        fieldsOfStudy: ['Computer Science'],
+        filePath: file.name,
+        isSeed: false
       };
 
       const newPaper = LibraryService.addPaper(mockPaper);
@@ -162,9 +162,9 @@ const LibraryModal: React.FC<LibraryModalProps> = ({
                       <p className="text-sm text-gray-600 mb-1">
                         {paper.authors.map(author => author.name).join(', ')}
                       </p>
-                      {paper.publication_date && (
+                      {paper.publicationDate && (
                         <p className="text-xs text-gray-500">
-                          {paper.publication_date}
+                          {paper.publicationDate}
                         </p>
                       )}
                     </div>
