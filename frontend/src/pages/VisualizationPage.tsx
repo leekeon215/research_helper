@@ -6,7 +6,7 @@ import type { VisualizationView } from '../types/visualization';
 interface VisualizationPageProps {
   views: VisualizationView[];
   currentViewIndex: number;
-  onNodeClick: (nodeId: string) => void;
+  onNodeClick: (nodeId: string) => Promise<void>;
   onNavigateToView: (viewIndex: number) => void;
 }
 
@@ -22,7 +22,7 @@ const VisualizationPage: React.FC<VisualizationPageProps> = ({
       currentViewIndex={currentViewIndex}
       onNavigateToView={onNavigateToView}
     >
-      {views.map((view, index) => (
+      {views.map((view) => (
         <VisualizationSlide
           key={view.id}
           view={view}

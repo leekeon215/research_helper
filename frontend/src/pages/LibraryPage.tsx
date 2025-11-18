@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LibraryService } from '../services/libraryService';
+import FileUpload from '../components/library/FileUpload';
 import type { LibraryPaper } from '../types/paper';
 
 interface LibraryPageProps {
@@ -13,7 +14,6 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
 }) => {
   const [papers, setPapers] = useState<LibraryPaper[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   // 라이브러리 데이터 로드
@@ -26,41 +26,17 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
     ? LibraryService.searchPapers(searchQuery)
     : papers;
 
-  // 파일 업로드 처리
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
+  // 파일 업로드 성공 처리
+  const handleUploadSuccess = (filename: string) => {
+    // 업로드 성공 후 라이브러리 새로고침
+    setPapers(LibraryService.getLibraryPapers());
     setUploadError(null);
+    console.log('파일 업로드 성공:', filename);
+  };
 
-    try {
-      // Mock 파일 업로드 - 실제 API 연동 시 교체 예정
-      // const uploadResult = await uploadService.uploadFile(file);
-      
-      // 임시 Mock 데이터 생성
-      const mockPaper: Omit<LibraryPaper, 'id' | 'uploaded_at'> = {
-        title: file.name.replace(/\.[^/.]+$/, ''), // 확장자 제거
-        authors: [{ name: 'Unknown Author' }],
-        type: 'paper',
-        publication_date: new Date().toISOString().split('T')[0],
-        venue: 'Uploaded Document',
-        abstract: 'This is an uploaded document. Abstract will be extracted automatically.',
-        fields_of_study: ['Computer Science'],
-        file_path: file.name,
-        is_seed: false
-      };
-
-      LibraryService.addPaper(mockPaper);
-      setPapers(LibraryService.getLibraryPapers());
-      
-      // 파일 입력 초기화
-      event.target.value = '';
-    } catch (error) {
-      setUploadError(error instanceof Error ? error.message : 'Upload failed');
-    } finally {
-      setIsUploading(false);
-    }
+  // 파일 업로드 에러 처리
+  const handleUploadError = (error: string) => {
+    setUploadError(error);
   };
 
   // 논문 삭제
@@ -97,23 +73,14 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                 닫기
               </button>
             )}
-            <button
-              onClick={() => document.getElementById('file-upload')?.click()}
-              disabled={isUploading}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isUploading ? '업로드 중...' : '논문 추가'}
-            </button>
           </div>
         </div>
 
-        {/* 파일 업로드 (숨김) */}
-        <input
-          id="file-upload"
-          type="file"
-          accept=".pdf,.txt,.docx"
-          onChange={handleFileUpload}
-          className="hidden"
+        {/* 파일 업로드 */}
+        <FileUpload
+          onUploadSuccess={handleUploadSuccess}
+          onUploadError={handleUploadError}
+          className="mt-4"
         />
 
         {/* 검색바 */}
@@ -177,12 +144,11 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
               }
             </p>
             {!searchQuery && (
-              <button
-                onClick={() => document.getElementById('file-upload')?.click()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                논문 업로드
-              </button>
+              <FileUpload
+                onUploadSuccess={handleUploadSuccess}
+                onUploadError={handleUploadError}
+                className="max-w-md mx-auto"
+              />
             )}
           </div>
         ) : (
@@ -208,9 +174,9 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
 
                   {/* 메타데이터 */}
                   <div className="space-y-1 mb-3">
-                    {paper.publication_date && (
+                    {paper.publicationDate && (
                       <p className="text-xs text-gray-500">
-                        📅 {paper.publication_date}
+                        📅 {paper.publicationDate}
                       </p>
                     )}
                     {paper.venue && (
@@ -218,9 +184,9 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                         📚 {paper.venue}
                       </p>
                     )}
-                    {paper.citation_count && (
+                    {paper.citationCount && (
                       <p className="text-xs text-gray-500">
-                        📊 {paper.citation_count.toLocaleString()} 인용
+                        📊 {paper.citationCount.toLocaleString()} 인용
                       </p>
                     )}
                   </div>
@@ -233,16 +199,16 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
                   )}
 
                   {/* 연구 분야 */}
-                  {paper.fields_of_study && paper.fields_of_study.length > 0 && (
+                  {paper.fieldsOfStudy && paper.fieldsOfStudy.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-3">
-                      {paper.fields_of_study.slice(0, 3).map((field) => (
+                      {paper.fieldsOfStudy.slice(0, 3).map((field) => (
                         <span key={field} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
                           {field}
                         </span>
                       ))}
-                      {paper.fields_of_study.length > 3 && (
+                      {paper.fieldsOfStudy.length > 3 && (
                         <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded">
-                          +{paper.fields_of_study.length - 3}
+                          +{paper.fieldsOfStudy.length - 3}
                         </span>
                       )}
                     </div>
@@ -250,7 +216,7 @@ const LibraryPage: React.FC<LibraryPageProps> = ({
 
                   {/* 업로드 정보 */}
                   <div className="flex items-center justify-between text-xs text-gray-500 pt-3 border-t border-gray-100">
-                    <span>업로드: {new Date(paper.uploaded_at).toLocaleDateString()}</span>
+                    <span>업로드: {new Date(paper.uploadedAt).toLocaleDateString()}</span>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

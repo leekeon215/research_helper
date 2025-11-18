@@ -4,13 +4,13 @@ export interface Paper {
   id: string;
   title: string;
   authors: Author[];
-  publication_date?: string;
+  publicationDate?: string;
   venue?: string;
-  citation_count?: number;
+  citationCount?: number;
   abstract?: string;
-  url?: string;
+  openAccessPdf?: string;
   tldr?: string;
-  fields_of_study?: string[];
+  fieldsOfStudy?: string[];
   type: 'paper' | 'author';
 }
 
@@ -35,7 +35,7 @@ export interface PaperEdge {
   source: string;
   target: string;
   type: 'citation' | 'similarity';
-  score: number;
+  similarity: number;
 }
 
 export interface PaperGraph {
@@ -47,9 +47,9 @@ export interface PaperGraph {
 }
 
 export interface LibraryPaper extends Paper {
-  uploaded_at: string;
-  file_path?: string;
-  is_seed?: boolean;
+  uploadedAt: string;
+  filePath?: string;
+  isSeed?: boolean;
 }
 
 

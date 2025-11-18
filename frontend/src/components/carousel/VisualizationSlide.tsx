@@ -5,12 +5,14 @@ import type { VisualizationView, PaperNode } from '../../types/visualization';
 
 interface VisualizationSlideProps {
   view: VisualizationView;
-  onNodeClick: (nodeId: string) => void;
+  onNodeClick: (nodeId: string) => Promise<void>;
+  onSidebarExplore?: (nodeId: string) => Promise<void>;
 }
 
 const VisualizationSlide: React.FC<VisualizationSlideProps> = ({
   view,
-  onNodeClick
+  onNodeClick,
+  onSidebarExplore
 }) => {
   const [selectedPaper, setSelectedPaper] = useState<PaperNode | null>(null);
   const [isExpanding, setIsExpanding] = useState(false);
@@ -25,14 +27,30 @@ const VisualizationSlide: React.FC<VisualizationSlideProps> = ({
     }
   }, [view.graph.seedNodeId, view.graph.nodes, selectedPaper]);
 
-  // 노드 클릭 처리 (더블클릭으로 확장)
-  const handleNodeClick = (nodeId: string) => {
+  // 노드 클릭 처리 (더블클릭으로 확장, 로딩 표시 없음)
+  const handleNodeClick = async (nodeId: string) => {
+    try {
+      // 새로운 시각화 생성 (로딩 표시 없이)
+      await onNodeClick(nodeId);
+    } catch (error) {
+      console.error('Node expansion failed:', error);
+    }
+  };
+
+  // 사이드바 확장 버튼 클릭 처리 (로딩 표시 포함)
+  const handleSidebarExplore = async (nodeId: string) => {
     // 로딩 상태 설정
     setIsExpanding(true);
     
     try {
       // 새로운 시각화 생성
-      onNodeClick(nodeId);
+      if (onSidebarExplore) {
+        await onSidebarExplore(nodeId);
+      } else {
+        await onNodeClick(nodeId);
+      }
+    } catch (error) {
+      console.error('Node expansion failed:', error);
     } finally {
       // 로딩 상태 해제
       setIsExpanding(false);
@@ -75,10 +93,30 @@ const VisualizationSlide: React.FC<VisualizationSlideProps> = ({
             )}
           </div>
 
+          {/* 확장 로딩 오버레이 */}
+          {isExpanding && (
+            <div className="absolute inset-0 z-20 bg-black bg-opacity-50 flex items-center justify-center">
+              <div className="bg-white rounded-xl shadow-2xl px-8 py-6 flex items-center space-x-4">
+                <svg className="animate-spin h-8 w-8 text-blue-600" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900">논문 확장 중...</p>
+                  <p className="text-sm text-gray-600">유사한 논문들을 찾고 있습니다</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 그래프 컴포넌트 */}
           <GraphComponent
             graph={view.graph}
+            onNodeClick={handleNodeClick}
+            selectedNodeId={selectedPaper?.id}
+            isExpanding={isExpanding}
             searchMode={view.graph.searchMode}
+            isExpanding={isExpanding}
           />
           
           {/* 그래프 컨트롤 */}
@@ -115,7 +153,7 @@ const VisualizationSlide: React.FC<VisualizationSlideProps> = ({
         {/* 사이드 패널 */}
         <Sidebar 
           selectedPaper={selectedPaper?.data as any} 
-          onExplorePaper={handleNodeClick}
+          onExplorePaper={handleSidebarExplore}
         />
       </div>
     </div>

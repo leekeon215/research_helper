@@ -1,144 +1,218 @@
 # main.py
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from typing import List
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from config import Config
-from models import UploadResponse, SimilarityResult, SearchRequest
-from database import db_manager
-from file_handler import file_handler
-from similarity_search import similarity_searcher
+from core.config import settings
+from models.schemas import UploadResponse, SimilarityResult, SearchRequest, TitleSearchRequest, AuthorSearchRequest
+from database.weaviate_db import db_manager_instance as db_manager, get_db_manager, WeaviateManager
+from utils.file_handler import FileHandler, get_file_handler
+from service.document_service import DocumentService, get_document_service
 
 # 로깅 설정
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# lifespan 함수
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 애플리케이션 시작/종료 시 실행되는 함수
-    # 시작 시
     try:
+        logger.info("Application startup: Connecting to Weaviate...")
         db_manager.connect()
-        db_manager.ensure_collection_exists() # 컬렉션이 존재하는지 확인
-        logger.info("FastAPI 애플리케이션 시작됨")
+        db_manager.ensure_collection_exists()
+        logger.info("Application startup successful. Weaviate connected.")
         yield
+    except Exception as e:
+         logger.critical(f"Fatal error during application startup: {e}", exc_info=True)
+         # Optionally re-raise to prevent app from starting in a bad state
+         raise e
+        #  yield
     finally:
-        # 종료 시
+        logger.info("Application shutdown: Closing Weaviate connection...")
         db_manager.close()
-        logger.info("FastAPI 애플리케이션 종료됨")
+        logger.info("Application shutdown complete.")
 
-# FastAPI 애플리케이션 생성
+# FastAPI 앱 생성
 app = FastAPI(
-    title="RAG 파일 유사도 검색 시스템",
-    description="업로드된 파일과 유사한 문서를 검색하는 RAG 시스템",
+    title="RAG File Similarity Search System",
+    description="RAG system to search similar documents from uploaded files.",
     version="1.0.0",
     lifespan=lifespan
 )
 
-# CORS 미들웨어 추가
+# CORS 미들웨어
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+    allow_methods=["*"], allow_headers=["*"],
 )
 
 @app.get("/")
 async def root():
-    # 루트 엔드포인트
-    return {"message": "RAG 파일 유사도 검색 시스템이 실행 중입니다"}
+    return {"message": "RAG File Similarity Search System is running"}
 
 @app.get("/health")
-async def health_check():
-    # 서비스 상태 확인
-    try:
-        # Weaviate 연결 확인
-        collection = db_manager.get_collection()
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now(),
-            "weaviate_connected": True
-        }
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"서비스 상태 불량: {str(e)}")
+async def health_check(db: WeaviateManager = Depends(get_db_manager)):
+    if not db or not db.client or not db.client.is_connected():
+         logger.error("Health check failed: Database service unavailable.")
+         raise HTTPException(status_code=503, detail="Database service unavailable")
+    
+    return {"status": "healthy", "timestamp": datetime.now(), "weaviate_connected": True}
+
 
 @app.post("/upload", response_model=UploadResponse)
-async def upload_file(file: UploadFile = File(...)):
-    # 파일 업로드 및 유사도 검색
+async def upload_file(
+    file: UploadFile = File(...),
+    handler: FileHandler = Depends(get_file_handler),
+    service: DocumentService = Depends(get_document_service)
+):
+    file_path: Path | None = None
+    original_filename = file.filename if file else "unknown_file"
+    logger.info(f"Received file upload request for: {original_filename}")
+
     try:
-        logger.info(f"파일 업로드 요청: {file.filename}")
-        
-        # 파일 처리 및 DB 저장
-        similar_documents = await file_handler.process_uploaded_file(file)
-        
-        # 응답 생성
+        # 1. Validate File (Handler)
+        handler.validate_file(file)
+
+        # 2. Save Temporarily (Handler)
+        file_path = await handler.save_uploaded_file(file)
+
+        # 3. Process and Store Document (Service)
+        # Assuming sync for now:
+        stored_ids = service.process_and_store_document(file_path, original_filename)
+
+        # 4. Create Response
+        response_message = f"File '{original_filename}' uploaded and processed successfully."
+        if isinstance(stored_ids, list):
+             response_message += f" Stored {len(stored_ids)} chunks."
+        else:
+             logger.warning("Processing did not return a list of stored IDs.")
+
         response = UploadResponse(
-            filename=file.filename,
-            message=f"파일 '{file.filename}'이(가) 성공적으로 업로드 및 처리되었습니다.",
-            upload_timestamp=datetime.now()
+            filename=original_filename,
+            message=response_message,
+            upload_timestamp=datetime.now(timezone.utc)
         )
-        
-        logger.info(f"파일 업로드 완료: {file.filename}")
+        logger.info(f"File upload completed successfully for: {original_filename}")
         return response
-        
-    except HTTPException:
-        raise
+
+    except HTTPException as http_exc:
+        logger.warning(f"HTTP Exception during upload for {original_filename}: {http_exc.status_code} - {http_exc.detail}")
+        raise http_exc
+    except ValueError as ve:
+         logger.error(f"ValueError during upload processing for {original_filename}: {ve}", exc_info=True)
+         raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as rte:
+         logger.error(f"RuntimeError during upload processing for {original_filename}: {rte}", exc_info=True)
+         raise HTTPException(status_code=500, detail=f"Internal processing error: {rte}")
     except Exception as e:
-        logger.error(f"파일 업로드 실패: {str(e)}")
-        raise HTTPException(status_code=500, detail="파일 업로드 처리 중 오류가 발생했습니다")
+        logger.error(f"Unexpected error during file upload orchestration for {original_filename}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Unexpected internal server error during file upload.")
+    finally:
+        # 5. Clean up temporary file
+        if file_path and file_path.exists():
+            try:
+                file_path.unlink()
+                logger.info(f"Temporary file deleted: {file_path}")
+            except OSError as e:
+                logger.error(f"Error deleting temporary file {file_path}: {e}")
+
 
 @app.post("/search", response_model=List[SimilarityResult])
-async def search_documents(request: SearchRequest):
-    # 텍스트 기반 문서 검색
+async def search_documents(
+    request: SearchRequest,
+    service: DocumentService = Depends(get_document_service)
+):
+    """Performs text-based similarity search using the DocumentService."""
+    if not request.query_text:
+        raise HTTPException(status_code=400, detail="query_text is required for search.")
+
+    logger.info(f"Received text search request: '{request.query_text[:50]}...'")
     try:
-        if not request.query_text:
-            raise HTTPException(status_code=400, detail="검색할 텍스트를 입력해주세요")
-        
-        logger.info(f"텍스트 검색 요청: {request.query_text[:50]}...")
-        
-        # 유사도 검색 수행
-        results = similarity_searcher.search_by_text(
+        results = service.search_by_text(
             query_text=request.query_text,
             limit=request.limit,
-            distance_threshold=1.0 - request.similarity_threshold
+            similarity_threshold=request.similarity_threshold
         )
-        
-        logger.info(f"텍스트 검색 완료: {len(results)}개 결과")
+        logger.info(f"Text search completed: {len(results)} results found.")
         return results
-        
     except HTTPException:
-        raise
+         raise
+    except ValueError as ve: 
+         logger.warning(f"Invalid search request: {ve}")
+         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        logger.error(f"텍스트 검색 실패: {str(e)}")
-        raise HTTPException(status_code=500, detail="검색 처리 중 오류가 발생했습니다")
+        logger.error(f"Unexpected error during text search: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal error during search processing.")
+
+@app.post("/search/title", response_model=List[SimilarityResult])
+async def search_by_title(
+    request: TitleSearchRequest,
+    service: DocumentService = Depends(get_document_service)
+):
+    """Performs title-based metadata search."""
+    if not request.title_query:
+        raise HTTPException(status_code=400, detail="title_query is required.")
+    logger.info(f"Received title search request: '{request.title_query[:50]}...'")
+    try:
+        results = service.search_by_title(
+            title_query=request.title_query,
+            limit=request.limit
+        )
+        logger.info(f"Title search completed: {len(results)} results found.")
+        return results
+    except HTTPException:
+         raise
+    except Exception as e:
+        logger.error(f"Unexpected error during title search: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal error during title search.")
+
+@app.post("/search/author", response_model=List[SimilarityResult])
+async def search_by_author(
+    request: AuthorSearchRequest,
+    service: DocumentService = Depends(get_document_service)
+):
+    """Performs author-based metadata search."""
+    if not request.author_query:
+        raise HTTPException(status_code=400, detail="author_query is required.")
+    logger.info(f"Received author search request: '{request.author_query[:50]}...'")
+    try:
+        results = service.search_by_authors(
+            author_query=request.author_query,
+            limit=request.limit
+        )
+        logger.info(f"Author search completed: {len(results)} results found.")
+        return results
+    except HTTPException:
+         raise
+    except Exception as e:
+        logger.error(f"Unexpected error during author search: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal error during author search.")
 
 @app.get("/stats")
-async def get_stats():
-    # 시스템 통계 정보
+async def get_stats(db: WeaviateManager = Depends(get_db_manager)):
+    """Retrieves basic statistics about the document collection."""
+    logger.info("Received request for stats.")
     try:
-        collection = db_manager.get_collection()
-        
-        # 저장된 문서 수 조회
+        collection = db.get_collection()
         result = collection.aggregate.over_all(total_count=True)
-        document_count = result.total_count if result.total_count else 0
-        
+        document_count = result.total_count if result is not None and result.total_count is not None else 0
+        logger.info(f"Retrieved stats: total_documents={document_count}")
+
         return {
             "total_documents": document_count,
             "system_status": "running",
-            "timestamp": datetime.now()
+            "timestamp": datetime.now(timezone.utc)
         }
-        
     except Exception as e:
-        logger.error(f"통계 조회 실패: {str(e)}")
-        raise HTTPException(status_code=500, detail="통계 조회 중 오류가 발생했습니다")
+        logger.error(f"Failed to get stats: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error retrieving system statistics.")
 
+# main 실행 부분
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host=Config.API_HOST, port=Config.API_PORT)
+    logger.info(f"Starting RAG server on {settings.API_HOST}:{settings.API_PORT}")
+    uvicorn.run(app, host=settings.API_HOST, port=settings.API_PORT)
