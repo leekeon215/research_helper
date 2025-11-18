@@ -5,8 +5,7 @@ import datetime
 from typing import List, Dict, Any
 from fastapi import HTTPException, Depends
 from collections import defaultdict
-
-from core.models import (
+from schemas.search import (
     InternalSearchRequest, ExternalSearchRequest,
     InternalSearchResponse, InternalDocumentReference, ChunkReference,
     ExternalSearchResponse, ExternalReference,
