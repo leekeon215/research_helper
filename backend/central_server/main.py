@@ -5,7 +5,6 @@ from core.database import lifespan
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from typing import List, Dict, Any
-
 from core.config import settings
 from core.models import InternalSearchRequest, ExternalSearchRequest, InternalSearchResponse, ExternalSearchResponse
 from services.query_service import QueryService ,get_query_service
